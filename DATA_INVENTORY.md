@@ -1,0 +1,16 @@
+# Local data inventory
+
+Checked on 2026-10-17. Raw data and generated files are ignored by Git.
+
+| Input | Local status | Use |
+| --- | --- | --- |
+| NPPES monthly V2, dated 2026-10-12 | ZIP at repo root; 10 files extracted to `data/nppes/monthly_2026_10_12/` | Main NPI records, primary practice address, taxonomy codes, and the separate non-primary practice-location file. |
+| NPPES weekly V2, 2026-10-05 through 2026-10-11 | ZIP at repo root; 10 files extracted to `data/nppes/weekly_2026_10_05_11/` | Incremental update. Its date range overlaps the monthly snapshot; do not append it without reconciling by NPI. |
+| NPPES deactivation report, dated 2026-10-12 | ZIP at repo root; workbook extracted to `data/nppes/deactivated_2026_10_12/` | Cross-check deactivated NPIs. |
+| `Rate Benchmarking Individual Weights_Hackathon.xlsx` | At repo root | Contains `Taxonomy-Spec Xwalk` (213 individual-provider mappings), `Specialty Weights` (48 records), and `Spec-Proc Weights` (946 records). The crosswalk does not cover Type 2 organizations. |
+| Centene index files | Not in this checkout; team reports they are in shared Drive | Required to run network mapping. |
+| NUCC taxonomy CSV | Not in this checkout | Required to map taxonomy codes to standard descriptions, including Type 2 taxonomy. |
+
+Checks performed: all 21 extracted files match their archive entry sizes; the monthly and weekly NPI and practice-location CSVs parse with the expected header/data column counts; both workbooks open. This is a structural check, not a complete row-by-row data audit.
+
+Next: place the Centene index files and NUCC CSV in the local ignored `data/` folder, then build a streamed California NPPES subset from both primary and non-primary practice locations.

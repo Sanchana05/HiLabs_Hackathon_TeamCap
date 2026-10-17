@@ -1,0 +1,6 @@
+# Local source data and generated outputs
+/data/
+/outputs/
+/ratefiles/
+/NPPES_*.zip
+/Rate Benchmarking Individual Weights_Hackathon.xlsx
