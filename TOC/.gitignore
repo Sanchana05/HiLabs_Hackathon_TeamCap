@@ -1,0 +1,23 @@
+# Large data files (GitHub rejects files over 100 MB)
+healthnet_ratefiles/
+json_index_files/
+*.json
+!manifest.json
+
+# Generated outputs
+*.csv
+*.xlsx
+*.parquet
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
