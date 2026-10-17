@@ -1,0 +1,2 @@
+File_Name,Composite_FQS,Letter_Grade,Status,Code_Coverage_Score,Provider_Coverage_Score,Zero_Rate_Cleanliness,Rate_Type_Validity,Outlier_Control,Contract_Freshness,Duplicate_Cleanliness
+centene_healthnet_ca_ppo.json,70.72,B,Good / Usable with Filtering,61.0,0.1,100.0,100.0,85.0,100.0,100.0
