@@ -1,0 +1,24 @@
+{
+  "as_of": "2026-10-18",
+  "c3_quality_status": "REVIEW_REQUIRED",
+  "counts": {
+    "alternate": 1026,
+    "duplicate": 1056,
+    "expanded_rate_rows": 1795989,
+    "in_network_items": 1717,
+    "invalid": 6,
+    "negotiated_rate_groups": 397726,
+    "provider_reference_objects": 2825,
+    "published_prices": 1500288,
+    "selected": 14443,
+    "valid_non_benchmark": 1779458
+  },
+  "file_classification": "MIXED",
+  "plan_attribution": "SHARED_FILE_UNRESOLVED",
+  "selection_policy": "One actual published lower-median amount per exact context; alternate tiers retained in decisions; no PPO membership inferred.",
+  "sha256": "3b3e4e220f421010b8ef925a51d4a3c17863b9fbaa853841c1a4927eb74a0960",
+  "size_bytes": 701615514,
+  "source_file_id": "8f41591c8c6856bf",
+  "source_file_name": "2026-09-30_centene-management-company-llc_healthnet-ca_in-network.json",
+  "source_url": "https://www.centene.com/content/dam/centene/Centene%20Corporate/json/DOCUMENT/2026-09-30_centene-management-company-llc_healthnet-ca_in-network.json"
+}

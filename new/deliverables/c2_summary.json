@@ -1,0 +1,64 @@
+{
+  "ambetter_eoc_reference": "ambetter_ca_2026_eocs.csv",
+  "ambetter_eoc_sha256": "2d9d5934cc0722a87287bff4df98b3116af4b2391421dbaa01bc497fb6d503c3",
+  "classification_by_brand": {
+    "ambetter": {
+      "CONFIRMED_PPO": 59,
+      "EXCLUDED_NON_PPO": 378,
+      "PROVISIONAL_PPO": 95,
+      "UNRESOLVED": 676
+    },
+    "fidelis": {
+      "EXCLUDED_NON_PPO": 6
+    },
+    "healthnet": {
+      "CONFIRMED_PPO": 30,
+      "EXCLUDED_NON_PPO": 852,
+      "PROVISIONAL_PPO": 438,
+      "UNRESOLVED": 373
+    },
+    "qualchoice": {
+      "EXCLUDED_NON_PPO": 3,
+      "PROVISIONAL_PPO": 129,
+      "UNRESOLVED": 231
+    }
+  },
+  "cms_reference": "cms_2026_plan_attributes.csv",
+  "cms_reference_sha256": "77af846b14ad6ebe3a755c3c8c4056022ffb3b529e16c973c68f240df9b26933",
+  "collapsed_ppo_token_count": 1,
+  "confirmed_ppo_count": 89,
+  "conflict_review_count": 3,
+  "deduplicated_plan_file_edges": 3270,
+  "distinct_index_content_count": 10,
+  "downstream_target": "Health Net California commercial group PPO-linked file(s) only",
+  "evidence_register": "ppo_evidence_sources.csv",
+  "evidence_sha256": "1695291f4e87634ba8426cb79e1cdf44a3d9ecb180d014ff35bf45caf4f49deb",
+  "excluded_non_ppo_count": 1239,
+  "index_sha256": {
+    "2026-09-28_ambetter_index.json": "5bdedc3b0108305bd19d26cd554a57499982def9d79ec3052ca645c32a1df25a",
+    "2026-09-28_fidelis_index.json": "8d4e9262bf539d79b633685d1839ddba26d98f9fa4ee530a12453cdfc60934df",
+    "2026-09-28_qualchoice_alf_plan_index.json": "b793117d6d34aa94cefca4a65b5f2bba7bce9fa1a57aabc034a6bc6b00d53d37",
+    "2026-09-28_qualchoice_arnold_and_blevins_index.json": "4d2829d0fcd043e40c5225022b4da5081e74c8c900ff2b9837b3bd8d1a1a9f75",
+    "2026-09-28_qualchoice_big_four_index.json": "9cb0d901f8279a51dd72dab6b018a078d848a5d0f435971f0130121be398bf65",
+    "2026-09-28_qualchoice_city_of_fort_smith_index.json": "9cb0d901f8279a51dd72dab6b018a078d848a5d0f435971f0130121be398bf65",
+    "2026-09-28_qualchoice_city_of_hot_springs_index.json": "323fd9f3825ea1377fae5f23717fc9c3b89478b552308334bc81866559772fef",
+    "2026-09-28_qualchoice_dillards_index.json": "f6b9a4f8a1b32c1be4d150807100fc41c27b484fe6b04f365a8a234e8e3ebabb",
+    "2026-09-28_qualchoice_index.json": "fbf880349d00ae04179fd660f29b411a082d65b821d8a23b437269dedccce403",
+    "2026-09-28_qualchoice_jv_manufacturing_index.json": "1701c082c1725bbfb451860fe02293884b1ce11b5666f48f08937f68616ed96a",
+    "2026-09-30_healthnet_index.json": "a397c9f9605e0da76603cd13385bfac90314e1bcc7307ceff224a21482b85b58"
+  },
+  "invalid_ein_format_count": 154,
+  "mixed_rate_files_count": 6,
+  "out_of_scope_count": 0,
+  "ppo_only_rate_files_count": 0,
+  "provisional_ppo_count": 662,
+  "raw_plan_file_edges": 3275,
+  "retiree_review_count": 3,
+  "review_queue_count": 1942,
+  "rule_version": "2026.09-v4.0",
+  "selected_ppo_rate_files": 1,
+  "source_index_count": 11,
+  "total_plan_file_edges_audited": 3270,
+  "unique_rate_files_count": 33,
+  "unresolved_count": 1280
+}

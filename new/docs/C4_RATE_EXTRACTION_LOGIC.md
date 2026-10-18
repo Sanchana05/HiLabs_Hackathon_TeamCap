@@ -1,120 +1,44 @@
-# Challenge C4: Rate Extraction & Multi-Rate Conflict Resolution Logic
+# C4: Complete-file rate extraction and auditable selection
 
-## 1. Executive Summary & Objective
+## Contract and scope
 
-In **Challenge C4**, our pipeline extracts in-network negotiated rates for every provider in Centene's California Commercial Group PPO network. 
+C4 accepts one or more local CMS Transparency in Coverage in-network files through `RateFileInput`, repeated `--file`, or a C2 `file_manifest.csv` plus `--rate-dir`. Optional C3 details bind each input to its SHA-256 and quality status. C4 processes every `in_network` item and every published price; it has no code or row cap. Files can be JSON or JSON.gz. Its temporary SQLite state is disk-backed and removed after a successful or failed run.
 
-The central challenge in CMS Price Transparency Data (PTD) is that a single provider (defined by an NPI and TIN tuple) rarely has only one rate for a billing code. Instead, a provider frequently has **3 to 10 distinct negotiated rates for the exact same CPT code** under the same contract.
+The unit of output is a **file rate**, never a verified PPO contract. A `MIXED` file yields `plan_attribution=SHARED_FILE_UNRESOLVED`; all other files yield `UNVERIFIED_NETWORK_MEMBERSHIP`. A later network-attribution component can join verified plan/provider evidence using the source file ID and NPI/TIN keys without changing C4's extraction.
 
-The hackathon explicitly requires:
-> **"Where a provider has several rates for one code, state which one you keep and why."**
+## Published schema versus our selection policy
 
-This document establishes our **4-Tier Hierarchical Disambiguation Protocol**, explains the healthcare reimbursement principles governing each tier, and details how our engine resolves multi-rate conflicts deterministically with a complete audit trail.
+[CMS's in-network field guide](https://github.com/CMSgov/price-transparency-guide/blob/master/schemas/in-network-rates/README.md) defines five `negotiated_type` values and distinguishes dollar amounts from whole-number percentages. It makes `billing_class`, `setting`, and (for professional rates) `service_code` relevant, and permits code modifiers, bundled arrangements, `CSTM-00` wildcards, and `9999-12-31` when no expiration is stated. C4 follows those definitions. HiLabs' [public roster-automation paper](https://www.hilabs.com/new-website/pdf/Beyond_Standardization-Maximizing_Value_through_End-to-End_Roster_Automation.pdf) discusses provider-data validation, but gives no published rule for choosing between conflicting TiC negotiated prices. The rate-selection policy below is therefore our explicit analytic policy, **not a HiLabs or CMS mandated preference**.
 
----
+1. Stream `provider_references` into SQLite, then stream `in_network` items and expand each direct/referenced provider group into NPI/TIN associations. The reference pass handles either top-level JSON property order. Expand every listed service code independently.
+2. Validate presence and syntax of item identity, arrangement, negotiated type, amount, billing class, setting, expiration, service code, and provider keys. Normalize a valid hyphenated EIN to nine digits in `tin`, retaining the original spelling in `tin_raw`. Reject missing/unknown provider links, zero, nonnumeric or unrepresentable rates, expired rows (relative to required `--as-of`), and malformed fields. Preserve each rejected row and its reason. `npi: [0]` is an unknown NPI, so cannot be selected as a provider-level rate.
+3. Keep valid nonbenchmark rates in the decision file. This includes `derived`, `fee schedule`, `percentage`, `per diem`, institutional/both billing, bundles/capitation, and `CSTM-00`. The `rate_unit` column distinguishes percent, USD per day, and USD. A `VALID_NON_BENCHMARK` decision means the rate was parsed and validated; it does not convert a percentage or per-day amount into a service-dollar benchmark.
+4. For **professional, fee-for-service, negotiated dollar** rates with a concrete billing and service code, partition by source file, NPI, TIN type/value, code type/version, code, item name/description, arrangement, negotiated type, billing class, setting, service code, modifiers, bundle contents, covered services, and additional information. These fields are retained because collapsing across them could conflate different services or contracts.
+5. Remove exact published duplicates in that context, retaining the duplicate row and reason in the decision file. If one candidate remains, select it. If several distinct published candidates remain, select the **lower median observed candidate** by numeric amount, then source order. The selected amount is always an actual published rate; C4 never calculates and outputs a synthetic median. Alternates remain in the decision file and are **not** claimed to be inactive or wrong. Without plan-tier or contract evidence, the chosen row is a representative benchmark, not the uniquely applicable reimbursement.
 
-## 2. In-Network Rate File Architecture & Dereferencing
+Expiration is used to reject dates before the as-of date. A later expiration does **not** prove a newer or more applicable contract. `9999-12-31` is preserved as `NO_STATED_EXPIRY`, not claimed to be an active contract. We do not prefer POS 11 over another place of service: distinct settings remain distinct outputs.
 
-### 2.1 The Two-Pass Streaming Engine
-Centene's California in-network file (`...healthnet-ca_in-network.json`) spans gigabytes. Loading this JSON into memory at once causes `MemoryError` crashes. 
+C4 does not impose an arbitrary maximum dollar rate: an unusually high published amount remains traceable and can be reviewed with C3's outlier metric or an external benchmark. A positive amount alone does not establish that a contract is active or applies to the target PPO.
 
-Our extraction engine (`RateExtractor`) implements a bounded-memory, two-pass streaming parser:
-1. **Pass 1 (`provider_references` scanning)**: Streams top-level provider reference dictionaries into an indexed hash map:
-   $$\text{Reference Map}: \text{provider\_group\_id} \longrightarrow [\{\text{tin}: \dots, \text{npi}: [\dots]\}, \dots]$$
-2. **Pass 2 (`in_network.item` streaming with early code pruning)**: Streams code items, filters immediately for target benchmark codes (e.g., CMS shoppable & HiLabs weighted codes), dereferences provider groups, and unpacks individual provider records.
+## Outputs and interfaces
 
-### 2.2 Unpacking Individual NPIs (Resolving the Naive Aggregation Bug)
-A critical flaw in naive pipelines is recording `len(npi_list)` instead of iterating over providers. In the TiC schema, a `provider_group` contains an array of hundreds of individual NPIs billing under a common TIN. Our engine iterates over every NPI in the array:
-```python
-for npi in group.get("npi", []):
-    yield {
-        "npi": str(npi).strip(),
-        "tin": tin_value,
-        "billing_code": code,
-        "rate": negotiated_rate,
-        "billing_class": billing_class,
-        "service_codes": service_codes,
-        "expiration_date": expiration_date
-    }
-```
-This guarantees that **Deliverable 1** and **Deliverable 4** receive individual provider-level granularity.
+`c4_manifest.csv` has one row per input and relative paths. Each file gets a stable directory named by a hash of the source URL (or filename):
 
----
+- `selected_rates.csv`: one published benchmark candidate per exact context; includes `rate`, source locator, `rates_considered_count`, and `decision_reason`.
+- `rate_decisions.csv`: every expanded rate row, including invalid, valid nonbenchmark, exact duplicates, selected, and alternate candidates. An alternate points to `selected_source_locator`.
+- `c4_summary.json`: SHA-256, source URL, as-of date, C3 status, file classification, attribution limitation, policy, and reconciled counts.
 
-## 3. Why Providers Have Multiple Rates for the Same Billing Code
+CSV is the interchange contract for C5/C6 and later network evidence. NPI and TIN must be read as strings. No raw MRF or temporary SQLite database is committed.
 
-Multi-rate occurrences in PTD files are not random noise; they arise from specific statutory and contractual structures:
+Run from the repository root after downloading the files:
 
-```
-                               RAW RATES FOR (NPI, TIN, CODE)
-                                            │
-                              [Tier 1: Billing Class Filter]
-                               Professional vs Institutional?
-                                            │
-                                  Keep 'Professional'
-                     (Physician fee; removes hospital facility charge)
-                                            │
-                              [Tier 2: Place of Service Filter]
-                                POS 11 (Office) vs POS 21/22?
-                                            │
-                                   Keep POS 11 (Office)
-                     (Standard ambulatory baseline; removes facility fee)
-                                            │
-                             [Tier 3: Contract Freshness Filter]
-                                Different Expiration Dates?
-                                            │
-                                  Keep Latest Expiration
-                         (Current active renegotiated schedule)
-                                            │
-                             [Tier 4: Statistical Tiebreaker]
-                              Multiple Active Negotiated Tiers?
-                                            │
-                                     Keep MEDIAN Rate
-                       (Eliminates extreme high/low tier outliers)
-                                            │
-                             SINGLE DETERMINISTIC RATE SAVED
+```powershell
+$env:PYTHONPATH = "new"
+python -m pipeline.c4_rate_extractor.rate_extractor --manifest outputs/pipeline-smoke/file_manifest.csv --rate-dir data/ratefiles --c3-details new/deliverables/file_quality_details.json --as-of 2026-10-18 --output-dir outputs/c4
 ```
 
----
+Alternatively repeat `--file path/to/file.json.gz`. The Python port is `run_files([RateFileInput(path, source_url, file_classification, expected_sha256, c3_quality_status)], output_dir, as_of=date(...))`.
 
-## 4. The 4-Tier Conflict Resolution Protocol: Which Rate We Keep and Why
+## Gates and interpretation
 
-When a provider tuple $\langle \text{NPI}, \text{TIN}, \text{billing\_code} \rangle$ has multiple rates, we apply the following hierarchical decision rules:
-
-### Tier 1: Billing Class Precedence (Keep `professional` over `institutional`)
-* **Rule**: If both `professional` and `institutional` rates exist, **keep `professional`** and discard `institutional`.
-* **Why**:
-  - `professional`: The reimbursement paid to the physician for cognitive and surgical work (CMS Form 1500).
-  - `institutional`: The facility overhead reimbursement paid to a hospital or ambulatory surgery center (UB-04).
-  - Payer contracting teams benchmark physician compensation using professional fee schedules. Retaining an institutional rate for a physician distorts market benchmarking by conflating facility overhead with doctor pay.
-
-### Tier 2: Place of Service (POS) Precedence (Keep POS 11 `Office` over Hospital Facility)
-* **Rule**: If rates differ by `service_code`, **keep POS 11 (Office / Non-Facility)** over POS 21 (Inpatient Hospital) or POS 22 (Outpatient Hospital).
-* **Why**:
-  - In commercial health insurance, the standard benchmark for outpatient care (E/M visits, diagnostic exams) is the **Office** setting.
-  - In facility settings (POS 21/22), the physician's professional fee is discounted because practice expenses (nursing staff, equipment, rent) are separately billed by the hospital. 
-  - Standardizing on POS 11 provides an apples-to-apples baseline across independent practices and health systems.
-
-### Tier 3: Contract Freshness Precedence (Keep Latest `expiration_date`)
-* **Rule**: If rates originate from multiple contract schedules with different expiration dates, **keep the rate with the latest expiration date**.
-* **Why**:
-  - Payers frequently publish overlapping legacy contracts during multi-year renegotiation transitions.
-  - The schedule with the furthest future expiration date represents the most recently executed, legally active contract.
-
-### Tier 4: Statistical Median Tiebreaker across Active Tiers
-* **Rule**: If multiple active rates still exist within the same billing class, setting, and expiration date (e.g., multi-tier employer group rates), **keep the MEDIAN rate**.
-* **Why**:
-  - Commercial plans occasionally negotiate tiered rates (e.g. Tier 1 preferred copay network vs Tier 2 standard network).
-  - Taking the mathematical median eliminates skew from promotional discounts or super-specialized outlier carve-outs, delivering a statistically representative rate that reflects true central market tendency.
-
----
-
-## 5. Audit Trail & Rationale Tracking
-
-Every curated rate record in our pipeline includes an auditable `selection_rationale` column:
-- `UNIQUE_RATE`: Only one published rate existed.
-- `CONFLICT_RESOLVED: Selected 'professional' billing class over institutional facility rate.`
-- `CONFLICT_RESOLVED: Selected Office (POS 11) ambulatory rate over hospital facility rate.`
-- `CONFLICT_RESOLVED: Multiple active tiers found (3 rates). Filtered by professional office POS and selected MEDIAN rate ($135.50) to eliminate tier outliers.`
-
-This guarantees 100% transparency for regulatory audits and executive review.
+The full master runner executes C4 after C3 and records C4's complete counts. The existing C5–C7 stages consume at most 10,000 selected rows for their explicitly labeled demonstration output; this cap does not affect C4 files. Do not label C4 rows as PPO-network rates until the C1/C2 attribution and plan-specific provider evidence are repaired.

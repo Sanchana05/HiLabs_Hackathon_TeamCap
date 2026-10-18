@@ -7,6 +7,7 @@ data/indexes/*
 new/data/
 new/cache/
 new/outputs/
+new/deliverables/c4/
 outputs/
 ratefiles/
 NPPES_*.zip

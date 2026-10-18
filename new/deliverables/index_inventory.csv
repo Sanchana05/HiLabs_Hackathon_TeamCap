@@ -1,0 +1,12 @@
+source,blocks_count,last_updated_on,version,sha256,duplicate_content_of,raw_plan_file_edges
+2026-09-28_ambetter_index.json,28,2026-09-28,2.0.0,5bdedc3b0108305bd19d26cd554a57499982def9d79ec3052ca645c32a1df25a,,1120
+2026-09-28_fidelis_index.json,2,2026-09-28,2.0.0,8d4e9262bf539d79b633685d1839ddba26d98f9fa4ee530a12453cdfc60934df,,94
+2026-09-28_qualchoice_alf_plan_index.json,1,2026-09-28,2.0.0,b793117d6d34aa94cefca4a65b5f2bba7bce9fa1a57aabc034a6bc6b00d53d37,,32
+2026-09-28_qualchoice_arnold_and_blevins_index.json,1,2026-09-28,2.0.0,4d2829d0fcd043e40c5225022b4da5081e74c8c900ff2b9837b3bd8d1a1a9f75,,1
+2026-09-28_qualchoice_big_four_index.json,1,2026-09-28,2.0.0,9cb0d901f8279a51dd72dab6b018a078d848a5d0f435971f0130121be398bf65,,4
+2026-09-28_qualchoice_city_of_fort_smith_index.json,1,2026-09-28,2.0.0,9cb0d901f8279a51dd72dab6b018a078d848a5d0f435971f0130121be398bf65,2026-09-28_qualchoice_big_four_index.json,4
+2026-09-28_qualchoice_city_of_hot_springs_index.json,1,2026-09-28,2.0.0,323fd9f3825ea1377fae5f23717fc9c3b89478b552308334bc81866559772fef,,2
+2026-09-28_qualchoice_dillards_index.json,1,2026-09-28,2.0.0,f6b9a4f8a1b32c1be4d150807100fc41c27b484fe6b04f365a8a234e8e3ebabb,,12
+2026-09-28_qualchoice_index.json,1,2026-09-28,2.0.0,fbf880349d00ae04179fd660f29b411a082d65b821d8a23b437269dedccce403,,308
+2026-09-28_qualchoice_jv_manufacturing_index.json,1,2026-09-28,2.0.0,1701c082c1725bbfb451860fe02293884b1ce11b5666f48f08937f68616ed96a,,5
+2026-09-30_healthnet_index.json,2,2026-09-30,2.0.0,a397c9f9605e0da76603cd13385bfac90314e1bcc7307ceff224a21482b85b58,,1693
