@@ -1,0 +1,11 @@
+{
+  "candidate_rows": 220,
+  "unique_six_column_keys": 220,
+  "workbook_sheets": [
+    "Rate candidates",
+    "Evidence",
+    "Scope and sources"
+  ],
+  "problems": {},
+  "passed": true
+}

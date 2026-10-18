@@ -8,6 +8,8 @@ new/data/
 new/cache/
 new/outputs/
 new/deliverables/c4/
+new/deliverables/c5/*.sqlite
+new/deliverables/c6/*.sqlite
 outputs/
 ratefiles/
 NPPES_*.zip

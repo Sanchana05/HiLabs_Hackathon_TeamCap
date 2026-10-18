@@ -1,0 +1,17 @@
+{
+  "counts": {
+    "selected_c4_rows": 14443,
+    "six_column_code_groups": 12223,
+    "MULTIPLE_TINS_FOR_NPI": 712,
+    "NO_SINGLE_CORROBORATED_CA_SITE": 11181,
+    "exported_candidate_rows": 220,
+    "ADDITIONAL_UNRESOLVED_SITE_CANDIDATES": 103,
+    "MULTIPLE_CORROBORATED_CA_SITES": 5,
+    "MULTIPLE_RATES_FOR_SIX_COLUMN_KEY": 2
+  },
+  "c2_linked_source_file_ids": [
+    "8f41591c8c6856bf"
+  ],
+  "status": "research_candidates; address independently corroborated, TIN/site and exact PPO/site unverified",
+  "rule": "One TIN, one corroborated CA site and no alternate site for the NPI; one published rate per six-column key. Shared MRF linkage supports PPO rate candidacy, not a direct directory or TIN/site assertion."
+}

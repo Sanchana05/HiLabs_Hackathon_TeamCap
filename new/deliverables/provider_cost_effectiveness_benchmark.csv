@@ -1,6 +1,0 @@
-NPI,TIN,Specialty,Codes_Evaluated,Weighted_Rate_Score,Peer_Median_Score,SPI,Savings_Opportunity_Index,Specialty_Peer_Percentile,Cost_Effectiveness_Tier
-1234567890,951234567,Family Medicine,2,100.75,100.75,1.0,0.0,67.0,Tier 2: Market Parity (Competitive)
-1456789012,959876543,Diagnostic Radiology,1,10.5,10.5,1.0,0.0,100.0,Tier 2: Market Parity (Competitive)
-1678901234,951234567,Family Medicine,1,0.57,0.57,1.0,0.0,67.0,Tier 2: Market Parity (Competitive)
-1789012345,954567890,Family Medicine,1,7.8,7.8,1.0,0.0,67.0,Tier 2: Market Parity (Competitive)
-1987654321,957654321,Internal Medicine,2,106.25,106.25,1.0,0.0,100.0,Tier 2: Market Parity (Competitive)

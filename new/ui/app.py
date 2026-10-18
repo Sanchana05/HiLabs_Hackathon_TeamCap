@@ -60,10 +60,25 @@ def load_quality_details():
 
 @st.cache_data
 def load_rates():
-    excel_path = DELIVERABLES_DIR / "Centene_CA_Commercial_PPO_Provider_Rates.xlsx"
-    if excel_path.is_file():
-        return pd.read_excel(excel_path)
+    csv_path = DELIVERABLES_DIR / "c6" / "c6_verified_rates.csv"
+    if csv_path.is_file():
+        return pd.read_csv(csv_path, dtype={"NPI": str, "TIN": str}, nrows=100_000)
     return pd.DataFrame()
+
+@st.cache_data
+def load_rate_candidates():
+    csv_path = DELIVERABLES_DIR / "c6" / "c6_supported_rate_candidates.csv"
+    if csv_path.is_file():
+        return pd.read_csv(csv_path, dtype={"NPI": str, "TIN": str, "Billing Code": str}, nrows=100_000)
+    return pd.DataFrame()
+
+@st.cache_data
+def load_c5_summary():
+    for path in (DELIVERABLES_DIR / "c5" / "c5_summary.json",
+                 NEW_DIR / "outputs" / "c5" / "c5_summary.json"):
+        if path.is_file():
+            return json.loads(path.read_text(encoding="utf-8"))
+    return {}
 
 @st.cache_data
 def load_decisions():
@@ -80,8 +95,10 @@ def load_manifest():
     return pd.DataFrame()
 
 summary_data = load_summary()
+c5_summary = load_c5_summary()
 quality_details = load_quality_details()
 rates_df = load_rates()
+candidate_df = load_rate_candidates()
 dec_df = load_decisions()
 manifest_df = load_manifest()
 
@@ -90,7 +107,7 @@ manifest_df = load_manifest()
 # -------------------------------------------------------------
 if view_mode == "📊 Executive Overview & Quality":
     st.title("Executive Dashboard: Centene CA Commercial PPO Rate Intelligence")
-    st.markdown("C3 and C4 audit complete published rate files when their reports are present. C2 network attribution remains under review; C5–C7 use demonstration address data.")
+    st.markdown("C3 and C4 audit complete published rate files. C5 reports sourced site evidence; PPO participation and rate attribution remain separate gates.")
 
     selected_name = st.selectbox("Rate file", [row["file_name"] for row in quality_details]) if quality_details else None
     selected_quality = next((row for row in quality_details if row["file_name"] == selected_name), {})
@@ -104,7 +121,7 @@ if view_mode == "📊 Executive Overview & Quality":
     c4_reports = summary_data.get("c4_file_summaries", [])
     c4_selected = sum(report.get("counts", {}).get("selected", 0) for report in c4_reports)
     col4.metric("C4 Selected Rate Contexts", f"{c4_selected:,}" if c4_reports else "Not run", "PPO attribution unverified")
-    col5.metric("Verified Practice Address", "Not verified", "C5 requires independent sources")
+    col5.metric("Verified NPI/TIN/PPO site", f"{c5_summary.get('share_npis_with_fully_verified_link', 0)}%" if c5_summary else "Not run", "Exact payer and TIN/site proof")
 
     st.markdown("---")
     st.subheader("C3 File Quality & Completeness Scorecard")
@@ -166,13 +183,17 @@ elif view_mode == "🔍 Analyst Provider Rate Explorer":
     st.title("Analyst Portal: Deliverable 1 Provider Rate Browser")
     st.markdown("Search and analyze provider-level rates at the **NPI, TIN, Address, and Billing Code** level.")
 
-    if not rates_df.empty:
+    display_df = rates_df if not rates_df.empty else candidate_df
+    showing_candidates = rates_df.empty and not candidate_df.empty
+    if showing_candidates:
+        st.warning("Research candidates: addresses have independent CMS/NPPES support, but TIN/site and exact PPO/site participation remain unverified. Review the workbook's Evidence sheet before contracting use.")
+    if not display_df.empty:
         c1, c2, c3 = st.columns(3)
-        specialty_filter = c1.selectbox("Filter by Specialty", ["All Specialties"] + sorted(rates_df["Specialty"].dropna().unique().tolist()))
-        code_filter = c2.selectbox("Filter by Billing Code", ["All Codes"] + sorted(rates_df["Billing Code"].dropna().astype(str).unique().tolist()))
+        specialty_filter = c1.selectbox("Filter by Specialty", ["All Specialties"] + sorted(display_df["Specialty"].dropna().unique().tolist()))
+        code_filter = c2.selectbox("Filter by Billing Code", ["All Codes"] + sorted(display_df["Billing Code"].dropna().astype(str).unique().tolist()))
         search_query = c3.text_input("Search NPI / TIN / City", "")
 
-        filtered = rates_df.copy()
+        filtered = display_df.copy()
         if specialty_filter != "All Specialties":
             filtered = filtered[filtered["Specialty"] == specialty_filter]
         if code_filter != "All Codes":
@@ -192,11 +213,11 @@ elif view_mode == "🔍 Analyst Provider Rate Explorer":
         st.download_button(
             label="📥 Download Filtered Rate Data (CSV)",
             data=csv_data,
-            file_name="Centene_PPO_Filtered_Rates.csv",
+            file_name="Centene_PPO_Filtered_Candidates.csv" if showing_candidates else "Centene_PPO_Filtered_Rates.csv",
             mime="text/csv"
         )
     else:
-        st.warning("Rate dataset is empty or pipeline has not been executed.")
+        st.info("No fully evidenced PPO-specific rate rows are available. Review C5 site evidence and C2/C4 plan attribution.")
 
 # -------------------------------------------------------------
 # VIEW 4: C7 COST-EFFECTIVENESS BENCHMARKING
@@ -209,7 +230,9 @@ elif view_mode == "📈 C7 Cost-Effectiveness Benchmarking":
     """)
 
     cost_path = DELIVERABLES_DIR / "provider_cost_effectiveness_benchmark.csv"
-    if cost_path.is_file():
+    c6_summary_path = DELIVERABLES_DIR / "c6" / "c6_summary.json"
+    c6_status = json.loads(c6_summary_path.read_text(encoding="utf-8")) if c6_summary_path.is_file() else {}
+    if cost_path.is_file() and c6_status.get("counts", {}).get("exported_rate_rows", 0) > 0 and "C7" in summary_data.get("challenges_executed", []):
         cost_df = pd.read_csv(cost_path)
         st.dataframe(cost_df, use_container_width=True, hide_index=True)
     else:
@@ -223,11 +246,11 @@ elif view_mode == "📑 Deliverables & Logic Docs":
     tabs = st.tabs(["Deliverable 2: Logic File", "Deliverable 3: Quality Metrics", "Deliverable 4: Summary Metrics"])
 
     with tabs[0]:
-        logic_doc = (DELIVERABLES_DIR / "Logic_File.md")
-        if logic_doc.is_file():
-            st.markdown(logic_doc.read_text(encoding="utf-8"))
-        else:
-            st.info("Logic file generated by master pipeline.")
+        for name in ("C1_C2_METHODOLOGY_AND_LOGIC.md", "C4_RATE_EXTRACTION_LOGIC.md",
+                     "C5_ADDRESS_MAPPING_LOGIC.md"):
+            logic_doc = DOCS_DIR / name
+            if logic_doc.is_file():
+                st.markdown(logic_doc.read_text(encoding="utf-8"))
 
     with tabs[1]:
         d3_doc = (DELIVERABLES_DIR / "File_Quality_Metrics.md")
@@ -237,8 +260,11 @@ elif view_mode == "📑 Deliverables & Logic Docs":
             st.info("File Quality Metrics generated by master pipeline.")
 
     with tabs[2]:
+        if c5_summary:
+            st.subheader("Current C5 validation")
+            st.json({key: value for key, value in c5_summary.items() if key != "inputs"})
         sum_doc = (DELIVERABLES_DIR / "Summary_Metrics.md")
-        if sum_doc.is_file():
+        if sum_doc.is_file() and "synthetic" not in sum_doc.read_text(encoding="utf-8").lower():
             st.markdown(sum_doc.read_text(encoding="utf-8"))
         else:
-            st.info("Summary Metrics generated by master pipeline.")
+            st.info("Run the master pipeline to regenerate the combined summary.")

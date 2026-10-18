@@ -1,0 +1,13 @@
+{
+  "dataset": "mj5m-pzi6",
+  "source_url": "https://data.cms.gov/provider-data/sites/default/files/resources/52c3f098d7e56028a298fd297cb0b38d_1790972133/DAC_NationalDownloadableFile.csv",
+  "dataset_url": "https://data.cms.gov/provider-data/dataset/mj5m-pzi6",
+  "modified": "2026-10-02",
+  "target_npis": 3155,
+  "matched_npis": 324,
+  "counts": {
+    "source_rows": 3630233,
+    "matched_rows": 482
+  },
+  "local_csv": "new/evidence/cms_clinicians_ca_matched_2026-10-02.csv"
+}
