@@ -15,17 +15,12 @@
   "ppo_plans_identified_count": 452,
   "ppo_rate_files_identified_count": 1,
   "file_quality_scores": {
-    "composite_fqs": 70.72,
-    "grade": "B",
-    "quality_status": "Good / Usable with Filtering",
-    "dimension_scores": {
-      "S_code_coverage": 61.0,
-      "S_provider_coverage": 0.1,
-      "S_zero_rate_cleanliness": 100.0,
-      "S_rate_type_validity": 100.0,
-      "S_outlier_control": 85.0,
-      "S_contract_freshness": 100.0,
-      "S_duplicate_cleanliness": 100.0
+    "https://www.centene.com/content/dam/centene/Centene%20Corporate/json/DOCUMENT/2026-09-30_centene-management-company-llc_healthnet-ca_in-network.json": {
+      "composite_fqs": 83.33,
+      "grade": "B",
+      "quality_status": "REVIEW_REQUIRED",
+      "as_of": "2026-10-18",
+      "sha256": "3b3e4e220f421010b8ef925a51d4a3c17863b9fbaa853841c1a4927eb74a0960"
     }
   },
   "raw_rates_extracted_count": 8,
@@ -53,5 +48,7 @@
   "collapsed_token_count": 1,
   "retiree_review_count": 1,
   "execution_end_utc": "2026-10-17T17:38:42.600307+00:00",
-  "duration_seconds": 11.06
+  "duration_seconds": 11.06,
+  "c3_audit_status": "REAL_COMPLETE_FILE",
+  "other_challenges_status": "EARLIER_SYNTHETIC_DEMONSTRATION_NOT_VERIFIED"
 }

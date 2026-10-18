@@ -52,6 +52,13 @@ def load_summary():
     return {}
 
 @st.cache_data
+def load_quality_details():
+    path = DELIVERABLES_DIR / "file_quality_details.json"
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return []
+
+@st.cache_data
 def load_rates():
     excel_path = DELIVERABLES_DIR / "Centene_CA_Commercial_PPO_Provider_Rates.xlsx"
     if excel_path.is_file():
@@ -73,6 +80,7 @@ def load_manifest():
     return pd.DataFrame()
 
 summary_data = load_summary()
+quality_details = load_quality_details()
 rates_df = load_rates()
 dec_df = load_decisions()
 manifest_df = load_manifest()
@@ -82,35 +90,36 @@ manifest_df = load_manifest()
 # -------------------------------------------------------------
 if view_mode == "📊 Executive Overview & Quality":
     st.title("Executive Dashboard: Centene CA Commercial PPO Rate Intelligence")
-    st.markdown("Automated curation pipeline identifying Centene's commercial group PPO network, grading file quality, and mapping providers to verified practice addresses.")
+    st.markdown("C3 is audited on the complete published rate file. The older C4–C7 demonstration outputs include synthetic provider addresses and are not verified results.")
 
+    selected_name = st.selectbox("Rate file", [row["file_name"] for row in quality_details]) if quality_details else None
+    selected_quality = next((row for row in quality_details if row["file_name"] == selected_name), {})
     col1, col2, col3, col4, col5 = st.columns(5)
-    fqs = summary_data.get("file_quality_scores", {}).get("composite_fqs", 70.72)
-    grade = summary_data.get("file_quality_scores", {}).get("grade", "B")
+    fqs = selected_quality.get("composite_fqs")
+    grade = selected_quality.get("grade", "NOT_GRADED")
 
-    col1.metric("Composite File Quality Score", f"{fqs} / 100", f"Grade {grade}")
-    col2.metric("Confirmed PPO Plans", f"{summary_data.get('confirmed_ppo_count', 30)}", "Exact EOC Match")
-    col3.metric("Provisional PPO Plans", f"{summary_data.get('provisional_ppo_count', 422)}", "Custom Group PPO")
-    col4.metric("Curated Provider Rates", f"{summary_data.get('curated_rates_count', 7):,}", "Resolved Conflicts")
-    col5.metric("Verified Practice Address", f"{summary_data.get('share_npis_verified_address', 100.0)}%", "100% CASS + Consensus")
+    col1.metric("C3 File Quality Score", f"{fqs} / 100" if fqs is not None else "Not graded", f"Grade {grade}")
+    col2.metric("Confirmed PPO Plans", str(summary_data.get('confirmed_ppo_count', 'N/A')), "Exact EOC Match")
+    col3.metric("Provisional PPO Plans", str(summary_data.get('provisional_ppo_count', 'N/A')), "Custom Group PPO")
+    col4.metric("C4 Demonstration Rates", f"{summary_data.get('curated_rates_count', 0):,}", "Not a verified full extraction")
+    col5.metric("Verified Practice Address", "Not verified", "C5 requires independent sources")
 
     st.markdown("---")
     st.subheader("C3 File Quality & Completeness Scorecard")
-    st.markdown("Evaluates whether Centene's rate file meets institutional contracting standards across 7 dimensions.")
-
-    dim_scores = summary_data.get("file_quality_scores", {}).get("dimension_scores", {})
+    if quality_details:
+        st.write(f"Audit status: **{selected_quality['quality_status']}**; as of {selected_quality['as_of']}; SHA-256: `{selected_quality['sha256']}`")
+        for flag in selected_quality.get("review_flags", []):
+            st.warning(flag.replace("_", " ").title())
+    dim_scores = selected_quality.get("dimension_scores", {})
     if dim_scores:
         score_df = pd.DataFrame([
-            {"Quality Dimension": "1. Code Coverage (S_code)", "Score (0-100)": dim_scores.get("S_code_coverage", 61.0), "Weight": "20%", "Contracting Rationale": "Weighted coverage of high-volume E/M and benchmark codes"},
-            {"Quality Dimension": "2. Provider Coverage (S_prov)", "Score (0-100)": dim_scores.get("S_provider_coverage", 0.1), "Weight": "20%", "Contracting Rationale": "Saturation of active California commercial NPIs and TINs"},
-            {"Quality Dimension": "3. Zero-Rate Cleanliness (S_zero)", "Score (0-100)": dim_scores.get("S_zero_rate_cleanliness", 100.0), "Weight": "20%", "Contracting Rationale": "Penalizes $0.00, negative, and dummy placeholder rates"},
-            {"Quality Dimension": "4. Rate Type Validity (S_type)", "Score (0-100)": dim_scores.get("S_rate_type_validity", 100.0), "Weight": "15%", "Contracting Rationale": "Clean fee-for-service allowed amounts vs volatile capitation/percentages"},
-            {"Quality Dimension": "5. Outlier Control (S_outlier)", "Score (0-100)": dim_scores.get("S_outlier_control", 85.0), "Weight": "10%", "Contracting Rationale": "Rates bounded within statistical IQR and clinical expectations"},
-            {"Quality Dimension": "6. Contract Freshness (S_fresh)", "Score (0-100)": dim_scores.get("S_contract_freshness", 100.0), "Weight": "10%", "Contracting Rationale": "Compliance with 30-day TiC monthly refresh requirements"},
-            {"Quality Dimension": "7. Duplicate Cleanliness (S_dup)", "Score (0-100)": dim_scores.get("S_duplicate_cleanliness", 100.0), "Weight": "5%", "Contracting Rationale": "Elimination of redundant Cartesian provider-code joins"}
+            {"Quality Dimension": key.replace("_", " ").title(),
+             "Score (0-100)": value,
+             "Weight": f"{selected_quality['weights'][key]:.0%}"}
+            for key, value in dim_scores.items()
         ])
         st.dataframe(score_df, use_container_width=True, hide_index=True)
-        st.bar_chart(score_df.set_index("Quality Dimension")["Score (0-100)"])
+        st.bar_chart(score_df.dropna(subset=["Score (0-100)"]).set_index("Quality Dimension")["Score (0-100)"])
 
 # -------------------------------------------------------------
 # VIEW 2: PPO NETWORK & PLAN CLASSIFICATION (PLAN RECONCILIATION)
