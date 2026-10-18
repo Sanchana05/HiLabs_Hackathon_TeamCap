@@ -12,7 +12,7 @@ However, extracting reliable intelligence from raw PTD is notoriously difficult:
 2. **Data Quality Deficits**: Published rate files are plagued by $0.00 rates, placeholder rates ($0.01, $99,999), Cartesian duplicates, missing core E/M codes, and contract staleness.
 3. **Provider Context**: Raw rate files link rates to an NPI and Tax ID (TIN) without practice addresses or specialties. NPPES address and taxonomy records require independent verification before they can support a provider-level deliverable.
 
-Current status: C3 grades complete source files and C4 audits and selects published rate contexts from complete source files. C1/C2 PPO classification remains under review, so C4 rates are not verified PPO-network claims. C5–C7 currently produce demonstration outputs using synthetic address seeds.
+Current status: C1/C2 runs repeatably from the supplied indexes with official 2026 EOC evidence and a conservative review queue. C3 grades complete source files and C4 audits and selects published rate contexts. The shared rate file does not establish PPO provider membership. C5–C7 currently produce demonstration outputs using synthetic address seeds.
 
 ---
 
@@ -83,10 +83,19 @@ new/
 - **Module**: `pipeline/c2_network_mapper/network_classifier.py`
 - **Documentation**: [`docs/C1_C2_METHODOLOGY_AND_LOGIC.md`](docs/C1_C2_METHODOLOGY_AND_LOGIC.md)
 - Implements statutory and regulatory insurance principles in California:
-  1. **Knox-Keene HMO Exclusion**: Commercial HMOs in California are licensed under the Knox-Keene Act via **Health Net of California, Inc.**, utilizing delegated capitated Independent Practice Associations (IPAs) without fee-for-service allowed amounts. Excludes `CanopyCare`, `SmartCare`, `Salud HMO y Más`, `CommunityCare HMO`.
-  2. **EPO Exclusion**: Closed exclusive provider networks with zero out-of-network benefits and narrower panels (`PureCare EPO`, `EnhancedChoice EPO`).
-  3. **POS Exclusion**: Two-tiered gatekeeper models requiring Primary Care Physician (PCP) referrals.
-  4. **PPO Identification**: Isolates open-access PPO health insurance underwritten by **Health Net Life Insurance Company** (regulated by the California Department of Insurance - CDI), mapping to the state commercial in-network rate file (`...healthnet-ca_in-network.json`).
+  1. **Scope**: Requires a California group file URL and an index date no later than the September 2026 cutoff.
+  2. **Evidence**: Confirms PPO product type and Full Network PPO name only on exact 2026 Health Net EOC matches. The published index EIN is sponsor-level, not a product key.
+  3. **Review**: Keeps custom PPO plans provisional, conflicting/retiree names unresolved, and explicit HMO/EPO/POS/EOA names out of the pure PPO set.
+  4. **Handoff**: Emits a PPO-linked file manifest for C3/C4 and marks shared files `MIXED`; file linkage does not establish provider-level PPO membership.
+
+Run C1/C2 independently, without C3/C4 inputs:
+
+```powershell
+$env:PYTHONPATH = "new"
+python -m pipeline.c2_network_mapper.run_c2 --index-dir data/indexes --output-dir new/deliverables
+```
+
+The output includes C1 provenance, C2 decisions, a provisional/unresolved review queue, an all-file inventory, the PPO-linked `file_manifest.csv`, and SHA-256 input hashes in `c2_summary.json`. See the [C1/C2 methodology](docs/C1_C2_METHODOLOGY_AND_LOGIC.md) for the decision contract.
 
 ### Challenge C3: Complete-file quality audit
 - **Module**: `pipeline/c3_file_grader/file_grader.py`
@@ -130,12 +139,12 @@ new/
 
 ---
 
-## 4. How to Run the Pipeline (Zero Hardcoded Paths)
+## 4. How to Run the Pipeline
 
 ### Prerequisites
 Install dependencies:
 ```bash
-pip install pandas openpyxl requests ijson streamlit numpy
+python -m pip install -r new/requirements.txt
 ```
 
 ### Running the End-to-End Pipeline

@@ -66,9 +66,9 @@ TARGET_NETWORK = "PPO"        # Preferred Provider Organization
 # Centene Brands Evaluation
 CENTENE_BRANDS = {
     "healthnet": {
-        "description": "Health Net of California, Inc. & Health Net Life Insurance Company",
+        "description": "Health Net California commercial group plans in the supplied TiC index",
         "has_ca_commercial_ppo": True,
-        "primary_entity": "Health Net Life Insurance Company (CDI-regulated PPO underwriter in CA)"
+        "primary_entity": "Healthnet, LLC (index issuer label; underwriting entity not inferred)"
     },
     "ambetter": {
         "description": "Ambetter (Individual ACA Marketplace on Covered CA)",
@@ -102,6 +102,7 @@ STATUS_CONFIRMED_PPO = "CONFIRMED_PPO"
 STATUS_PROVISIONAL_PPO = "PROVISIONAL_PPO"
 STATUS_EXCLUDED_NON_PPO = "EXCLUDED_NON_PPO"
 STATUS_UNRESOLVED = "UNRESOLVED"
+STATUS_OUT_OF_SCOPE = "OUT_OF_SCOPE"
 
 # Network Status Enums (Plan Step 5)
 NET_CONFIRMED = "CONFIRMED_NETWORK"

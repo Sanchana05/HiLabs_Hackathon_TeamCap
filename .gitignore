@@ -1,5 +1,8 @@
 .deps/
-data/
+data/*
+!data/indexes/
+data/indexes/*
+!data/indexes/*_index.json
 new/data/
 new/cache/
 new/outputs/

@@ -1,11 +1,12 @@
 # Executive Run Summary: Centene CA Commercial PPO Rate Curation
+**Historical full-pipeline run. For current C1/C2 counts and SHA-256 inputs, use `c2_summary.json`; for current C2 rows, use `plan_decisions.csv`.**
 **Pursuant to Centene California Commercial-Group PPO Classification Plan**
 
 **Status:** The C3 score below was independently rerun on the complete downloaded Centene MRF as of 2026-10-18. C4–C7 figures in this older summary came from synthetic demonstration rows and are not verified submission results. Use `file_quality_details.json` for C3 evidence.
 
 - **Execution Date**: 2026-10-17 17:38:31 UTC
 - **Target Snapshot Date**: 2026-09-30
-- **Target Payer**: Centene Corporation (Health Net Life Insurance Company)
+- **Target Payer**: Centene / Health Net
 - **Target Market**: Commercial Group, California (CA)
 - **Target Network**: Health Net Full Network PPO
 
@@ -19,7 +20,7 @@
 | **C2: Network Decisions** | **Confirmed CA Commercial PPO Plans** | **30** | Exact 2026 Small Group Full Network PPO EOC match |
 | | **Provisional CA Commercial PPO Plans** | **422** | Custom employer group PPO schedules + HDHP 1800 variants |
 | | **Total CA Commercial PPO Universe** | **452** | Combined Confirmed + Provisional PPO candidate scope |
-| | Ruled Out Knox-Keene HMO Plans | 2810 | Excluded: Capitated IPAs (CanopyCare, SmartCare, Salud) + EOA HMO |
+| | Historical non-PPO or out-of-scope rows | 2810 | Current C2 separates 852 explicit non-PPO labels and 1958 out-of-scope edges |
 | | Ruled Out POS Plans | 6 | Excluded: Two-tiered gatekeeper requiring PCP referral |
 | | EOA Overlap Sensitivity Cohort | 127 | Exclusive Option Advantage (HMO with PPO tier; flagged for sensitivity) |
 | | Collapsed Token Anomaly (CUSPPO) | 1 | Recovered via regex punctuation tokenization (`CA L CUSPPO`) |

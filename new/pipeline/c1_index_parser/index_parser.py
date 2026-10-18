@@ -18,7 +18,10 @@ from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import unquote, urlsplit, urlunsplit
 
 import pandas as pd
-import requests
+try:
+    import requests
+except ImportError:  # Local index ingestion does not require the optional HTTP client.
+    requests = None
 
 try:
     from pipeline.config import (
@@ -102,6 +105,8 @@ class CenteneIndexParser:
 
     def discover_official_index_urls(self, session: Optional[requests.Session] = None) -> List[str]:
         """Scrapes Centene's official price transparency landing page to find active index URLs."""
+        if requests is None:
+            raise RuntimeError("Online index discovery requires the requests package")
         s = session or requests.Session()
         discovered = set()
         try:
@@ -136,6 +141,8 @@ class CenteneIndexParser:
             if isinstance(file_path_or_url, Path) or Path(source_str).is_file():
                 content_bytes = Path(source_str).read_bytes()
             else:
+                if requests is None:
+                    raise RuntimeError("Remote index ingestion requires the requests package")
                 resp = requests.get(source_str, headers=HTTP_HEADERS, timeout=HTTP_TIMEOUT)
                 resp.raise_for_status()
                 content_bytes = resp.content
@@ -185,6 +192,7 @@ class CenteneIndexParser:
                 plan_id_type = str(plan.get("plan_id_type") or "").strip()
                 market_type = str(plan.get("plan_market_type") or "").strip()
                 issuer_name = str(plan.get("issuer_name") or "").strip()
+                plan_sponsor_name = str(plan.get("plan_sponsor_name") or "").strip()
 
                 for file_idx, f_info in enumerate(files):
                     raw_url = str(f_info.get("location") or "").strip()
@@ -204,6 +212,7 @@ class CenteneIndexParser:
                         "plan_id_type": plan_id_type,
                         "market_type": market_type,
                         "issuer_name": issuer_name,
+                        "plan_sponsor_name": plan_sponsor_name,
                         "rate_file_url": clean_url,
                         "raw_rate_file_url": raw_url,
                         "rate_file_name": extract_filename_from_url(clean_url),
@@ -223,17 +232,26 @@ class CenteneIndexParser:
         columns: brand, plan name, plan ID, market type, rate file URL.
         Many plans point to the same file, so remove duplicates.
         """
+        columns = ["brand", "plan_name", "plan_id", "plan_id_type", "market_type",
+                   "issuer_name", "plan_sponsor_name", "rate_file_url", "rate_file_name",
+                   "source_index", "source_indexes", "block_index", "last_updated_on", "index_version"]
         if not self.raw_records:
-            return pd.DataFrame(columns=["brand", "plan_name", "plan_id", "market_type", "rate_file_url"])
+            return pd.DataFrame(columns=columns)
 
         df = pd.DataFrame(self.raw_records)
 
         # Standardize and filter valid URLs
         valid_df = df[df["rate_file_url"] != ""].copy()
 
-        # Deduplicate on (brand, plan_name, plan_id, market_type, rate_file_url, rate_file_name)
-        c1_cols = ["brand", "plan_name", "plan_id", "market_type", "rate_file_url", "rate_file_name"]
-        dedup_df = valid_df[c1_cols].drop_duplicates().reset_index(drop=True)
+        # A sponsor EIN is not a product key. Preserve each exact plan-file edge
+        # and its identifier type, while retaining every source that reported it.
+        edge_cols = ["brand", "plan_name", "plan_id", "plan_id_type", "market_type", "rate_file_url"]
+        valid_df = valid_df.sort_values(["source_index", "block_index", "plan_position", "file_position"])
+        sources = valid_df.groupby(edge_cols, dropna=False, sort=False)["source_index"].agg(
+            lambda values: "|".join(sorted(set(values)))
+        ).rename("source_indexes")
+        dedup_df = valid_df.drop_duplicates(edge_cols).set_index(edge_cols).join(sources).reset_index()
+        dedup_df = dedup_df[columns].reset_index(drop=True)
 
         logger.info(
             "C1 Table Generated: %d total raw entries -> %d deduplicated plan-file relationships",
