@@ -1,6 +1,6 @@
-"""Challenge C5: Address Normalization & CASS Standardizer
-Implements USPS Publication 28 postal addressing standards, detects PO Boxes and commercial drops,
-and formats physical addresses into canonical strings for deduplication and matching.
+"""Lightweight address token normalization for candidate matching.
+
+This is not USPS CASS/DPV validation and cannot establish that a site exists.
 """
 from __future__ import annotations
 
@@ -34,12 +34,12 @@ RE_PO_BOX = re.compile(
     re.I
 )
 
-# California ZIP Code Bounds (90001 - 96162)
+# Coarse California-looking ZIP format check; state and source evidence still matter.
 CA_ZIP_PATTERN = re.compile(r"^(9[0-6]\d{3})(?:-?(\d{4}))?$")
 
 
 class AddressNormalizer:
-    """Standardizes healthcare practice addresses using USPS postal rules."""
+    """Normalizes common address tokens without claiming deliverability validation."""
 
     @staticmethod
     def is_po_box(address_line: str) -> bool:
@@ -73,11 +73,11 @@ class AddressNormalizer:
 
     @classmethod
     def standardize_zip(cls, zip_code: str) -> Tuple[str, bool]:
-        """Validates and standardizes a ZIP code, checking California ranges.
+        """Standardizes a ZIP and applies a coarse California-looking range check.
 
         Returns:
             canonical_zip: 5-digit or 9-digit standardized ZIP.
-            is_valid_ca: True if within California ZIP boundaries (90001 - 96162).
+            is_valid_ca: True if it passes the broad CA-format filter.
         """
         if not zip_code:
             return "", False

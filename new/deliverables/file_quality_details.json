@@ -3,7 +3,7 @@
     "as_of": "2026-10-18",
     "benchmark_codes": 579,
     "benchmark_codes_present": 134,
-    "benchmark_source": "new/config/c3_benchmark_codes.csv",
+    "benchmark_source": "new\\config\\c3_benchmark_codes.csv",
     "composite_fqs": 83.33,
     "counts": {
       "duplicate_provider_prices": 657738,
@@ -33,7 +33,7 @@
     "external_provider_coverage_pct": null,
     "file_classification": "MIXED",
     "file_name": "2026-09-30_centene-management-company-llc_healthnet-ca_in-network.json",
-    "file_path": "data/ratefiles/2026-09-30_centene-management-company-llc_healthnet-ca_in-network.json",
+    "file_path": "data\\ratefiles\\2026-09-30_centene-management-company-llc_healthnet-ca_in-network.json",
     "grade": "B",
     "index_last_updated_on": "2026-09-30",
     "matched_expected_npis": null,

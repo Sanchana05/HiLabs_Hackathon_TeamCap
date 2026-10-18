@@ -28,10 +28,9 @@ from pipeline.c1_index_parser.index_parser import CenteneIndexParser
 from pipeline.c2_network_mapper.network_classifier import NetworkClassifier
 from pipeline.c3_file_grader.file_grader import FileQualityGrader, write_reports
 from pipeline.c4_rate_extractor.rate_extractor import RateFileInput, run_files
-from pipeline.c5_address_mapper.address_normalizer import AddressNormalizer
-from pipeline.c5_address_mapper.nppes_taxonomy_resolver import NPPESTaxonomyResolver
-from pipeline.c5_address_mapper.tin_address_clusterer import TINAddressClusterer
-from pipeline.c6_rate_builder.rate_builder import ProviderRateFileBuilder
+from pipeline.c5_address_mapper.resolve import run_c5
+from pipeline.c6_rate_builder.verified_builder import build_verified_rates
+from pipeline.c6_rate_builder.candidate_builder import build_candidates
 from pipeline.c7_cost_effectiveness.cost_effectiveness import CostEffectivenessEngine
 from pipeline.config import (
     BENCHMARK_CODES,
@@ -58,7 +57,21 @@ def run_pipeline(
     index_files: Optional[List[Path]] = None,
     rate_files: Optional[List[Path]] = None,
     nppes_file: Optional[Path] = None,
+    nppes_secondary: Optional[Path] = None,
+    nppes_monthly_through: Optional[date] = None,
+    nppes_weekly_main: Optional[Path] = None,
+    nppes_weekly_secondary: Optional[Path] = None,
+    nppes_weekly_through: Optional[date] = None,
+    nppes_deactivations: Optional[Path] = None,
     taxonomy_file: Optional[Path] = None,
+    cms_clinicians_file: Optional[Path] = None,
+    cms_snapshot: Optional[date] = None,
+    payer_directory_file: Optional[Path] = None,
+    payer_snapshot: Optional[date] = None,
+    provider_roster_file: Optional[Path] = None,
+    roster_snapshot: Optional[date] = None,
+    ppo_directory_plans: Optional[List[str]] = None,
+    ppo_rate_attributions: Optional[List[str]] = None,
     output_dir: Optional[Path] = None,
     limit_codes: bool = True,
     as_of: Optional[date] = None,
@@ -73,7 +86,7 @@ def run_pipeline(
 
     summary_metrics = {
         "execution_start_utc": start_time.isoformat(),
-        "challenges_executed": ["C1", "C2", "C3", "C4", "C5", "C6", "C7"],
+        "challenges_executed": ["C1", "C2", "C3", "C4"],
         "index_files_parsed_count": 0,
         "raw_plan_records_count": 0,
         "deduplicated_plans_count": 0,
@@ -86,7 +99,9 @@ def run_pipeline(
         "unique_tins_count": 0,
         "unique_addresses_count": 0,
         "share_npis_verified_address": 0.0,
-        "downstream_validation_status": "C4 audits full selected files; C5 currently uses synthetic address seed rows. C5-C7 are demonstration outputs.",
+        "share_npis_corroborated_site": 0.0,
+        "share_npis_confirmed_ppo_site": 0.0,
+        "downstream_validation_status": "C5 requires explicit NPPES files; no synthetic provider or address evidence is used.",
         "deliverables_generated": []
     }
 
@@ -223,125 +238,64 @@ def run_pipeline(
     summary_metrics["curated_rates_count"] = sum(r["counts"].get("selected", 0) for r in c4_results)
     summary_metrics["deliverables_generated"].append("c4/c4_manifest.csv")
 
-    # Legacy C5-C7 operate on a bounded demonstration sample only. C4 files above
-    # remain complete and independent of this sample.
-    demo_path = out_dir / "c4" / c4_results[0]["source_file_id"] / "selected_rates.csv"
-    curated_rates_df = pd.read_csv(demo_path, dtype={"npi": str, "tin": str}, nrows=10_000)
-    curated_rates_df["service_codes"] = curated_rates_df["service_code"].fillna("")
-    curated_rates_df["selection_rationale"] = curated_rates_df["decision_reason"]
-    summary_metrics["downstream_demo_rows_count"] = len(curated_rates_df)
-
-    # =========================================================================
-    # CHALLENGE C5: Address & Specialty Mapping (TIN Consensus + NUCC)
-    # =========================================================================
-    logger.info(">>> STEP 5: Mapping NPI/TIN to Practicing Address & Specialty (Challenge C5)...")
-    nppes_resolver = NPPESTaxonomyResolver(taxonomy_dir=DATA_DIR / "nucc_taxonomy")
-    tin_clusterer = TINAddressClusterer()
-
-    # Pre-register candidate addresses for active providers
-    address_specialty_map = {}
-    unique_npis = curated_rates_df["npi"].unique()
-    unique_tins = curated_rates_df["tin"].unique()
-
-    # Example seed registry for demonstration and testing
-    sample_nppes_db = {
-        "1234567890": {
-            "NPI": "1234567890", "Entity Type Code": "1",
-            "Provider First Name": "Sarah", "Provider Last Name (Legal Name)": "Lin",
-            "Provider Credential Text": "MD", "Healthcare Provider Taxonomy Code_1": "207Q00000X",
-            "Provider First Line Business Practice Location Address": "100 MEDICAL CENTER DR",
-            "Provider Second Line Business Practice Location Address": "STE 300",
-            "Provider Business Practice Location Address City Name": "LOS ANGELES",
-            "Provider Business Practice Location Address State Name": "CA",
-            "Provider Business Practice Location Address Postal Code": "90024"
-        },
-        "1987654321": {
-            "NPI": "1987654321", "Entity Type Code": "1",
-            "Provider First Name": "David", "Provider Last Name (Legal Name)": "Miller",
-            "Provider Credential Text": "DO", "Healthcare Provider Taxonomy Code_1": "207R00000X",
-            "Provider First Line Business Practice Location Address": "200 MERCY WAY",
-            "Provider Business Practice Location Address City Name": "SACRAMENTO",
-            "Provider Business Practice Location Address State Name": "CA",
-            "Provider Business Practice Location Address Postal Code": "95819"
-        },
-        "1456789012": {
-            "NPI": "1456789012", "Entity Type Code": "1",
-            "Provider First Name": "Robert", "Provider Last Name (Legal Name)": "Chen",
-            "Provider Credential Text": "MD", "Healthcare Provider Taxonomy Code_1": "2085R0202X",
-            "Provider First Line Business Practice Location Address": "500 PASTEUR DR",
-            "Provider Business Practice Location Address City Name": "STANFORD",
-            "Provider Business Practice Location Address State Name": "CA",
-            "Provider Business Practice Location Address Postal Code": "94305"
-        }
-    }
-
-    # Register in TIN Consensus Graph
-    for _, r in curated_rates_df.iterrows():
-        npi = str(r["npi"])
-        tin = str(r["tin"])
-        raw_nppes = sample_nppes_db.get(npi, {
-            "NPI": npi, "Entity Type Code": "1",
-            "Healthcare Provider Taxonomy Code_1": "207Q00000X",
-            "Provider First Line Business Practice Location Address": "1200 WILSHIRE BLVD STE 400",
-            "Provider Business Practice Location Address City Name": "LOS ANGELES",
-            "Provider Business Practice Location Address State Name": "CA",
-            "Provider Business Practice Location Address Postal Code": "90017"
-        })
-        parsed_rec = nppes_resolver.parse_nppes_provider_record(raw_nppes)
-        tin_clusterer.register_provider_address(tin=tin, npi=npi, address_dict=parsed_rec)
-
-    # Disambiguate and assign highest-confidence physical address
-    verified_address_count = 0
-    for _, r in curated_rates_df.iterrows():
-        npi = str(r["npi"])
-        tin = str(r["tin"])
-        key = (npi, tin)
-        if key not in address_specialty_map:
-            raw_nppes = sample_nppes_db.get(npi, {
-                "NPI": npi, "Entity Type Code": "1",
-                "Healthcare Provider Taxonomy Code_1": "207Q00000X",
-                "Provider First Line Business Practice Location Address": "1200 WILSHIRE BLVD STE 400",
-                "Provider Business Practice Location Address City Name": "LOS ANGELES",
-                "Provider Business Practice Location Address State Name": "CA",
-                "Provider Business Practice Location Address Postal Code": "90017"
-            })
-            parsed_rec = nppes_resolver.parse_nppes_provider_record(raw_nppes)
-            best_match = tin_clusterer.resolve_best_address_for_provider(
-                tin=tin, npi=npi, candidate_addresses=[parsed_rec]
-            )
-            address_specialty_map[key] = best_match
-            if best_match["confidence_tier"] in ("HIGH", "MODERATE"):
-                verified_address_count += 1
-
-    summary_metrics["unique_npis_count"] = len(unique_npis)
-    summary_metrics["unique_tins_count"] = len(unique_tins)
-    summary_metrics["unique_addresses_count"] = len(set(v["address"] for v in address_specialty_map.values()))
-    summary_metrics["share_npis_verified_address"] = round(verified_address_count / max(1, len(address_specialty_map)) * 100.0, 2)
-
-    # =========================================================================
-    # CHALLENGE C6: Build Deliverable 1 Rate File (Excel)
-    # =========================================================================
-    logger.info(">>> STEP 6: Building Final Provider Rate File Deliverable (Challenge C6)...")
-    builder = ProviderRateFileBuilder(deliverables_dir=out_dir)
-    final_rate_df = builder.assemble_final_dataset(
-        curated_rates_df=curated_rates_df,
-        address_specialty_map=address_specialty_map
-    )
-    excel_path = builder.export_deliverable_excel(
-        final_df=final_rate_df,
-        filename="Centene_CA_Commercial_PPO_Provider_Rates.xlsx"
-    )
-    summary_metrics["deliverables_generated"].append(excel_path.name)
-
-    # =========================================================================
-    # CHALLENGE C7: Cost Effectiveness Benchmarking (Brownie Points)
-    # =========================================================================
-    logger.info(">>> STEP 7: Computing Cost Effectiveness Metrics (Challenge C7)...")
-    cost_engine = CostEffectivenessEngine()
-    cost_df = cost_engine.evaluate_cost_effectiveness(final_rate_df)
-    cost_path = out_dir / "provider_cost_effectiveness_benchmark.csv"
-    cost_df.to_csv(cost_path, index=False)
-    summary_metrics["deliverables_generated"].append(cost_path.name)
+    selected_rate_paths = [out_dir / "c4" / r["source_file_id"] / "selected_rates.csv" for r in c4_results]
+    if nppes_file or nppes_secondary or nppes_monthly_through:
+        if not nppes_file or not nppes_secondary or not nppes_monthly_through:
+            raise ValueError("C5 requires NPPES main, secondary, and monthly-through date together")
+        logger.info(">>> STEP 5: Mapping C4 NPI/TIN pairs to sourced practice sites (Challenge C5)...")
+        c5_dir = out_dir / "c5"
+        c5_summary = run_c5(
+            selected_rates=selected_rate_paths,
+            nppes_main=nppes_file, nppes_secondary=nppes_secondary,
+            monthly_through=nppes_monthly_through,
+            weekly_main=nppes_weekly_main, weekly_secondary=nppes_weekly_secondary,
+            weekly_through=nppes_weekly_through, deactivations=nppes_deactivations,
+            nucc=taxonomy_file, cms=cms_clinicians_file,
+            payer_directory=payer_directory_file, provider_roster=provider_roster_file,
+            cms_snapshot=cms_snapshot, payer_snapshot=payer_snapshot,
+            roster_snapshot=roster_snapshot,
+            ppo_plans=ppo_directory_plans or [], as_of=run_as_of, output_dir=c5_dir,
+        )
+        summary_metrics["challenges_executed"].append("C5")
+        summary_metrics["c5_summary"] = c5_summary
+        summary_metrics["unique_npis_count"] = c5_summary["unique_npis"]
+        summary_metrics["unique_tins_count"] = c5_summary["unique_tins"]
+        summary_metrics["unique_addresses_count"] = c5_summary["unique_physical_addresses"]
+        summary_metrics["share_npis_verified_address"] = c5_summary["share_npis_with_fully_verified_link"]
+        summary_metrics["share_npis_corroborated_site"] = c5_summary["share_npis_with_corroborated_site"]
+        summary_metrics["share_npis_confirmed_ppo_site"] = c5_summary["share_npis_with_confirmed_ppo_site"]
+        summary_metrics["deliverables_generated"].extend(f"c5/{name}" for name in c5_summary["outputs"])
+        logger.info(">>> STEP 6: Projecting only fully evidenced PPO sites and attributable rates (Challenge C6)...")
+        c6_summary = build_verified_rates(
+            selected_rate_paths, c5_dir / "c5_provider_locations.csv", out_dir / "c6",
+            allowed_plan_attributions=set(ppo_rate_attributions or []),
+        )
+        summary_metrics["challenges_executed"].append("C6")
+        summary_metrics["c6_summary"] = c6_summary
+        summary_metrics["deliverables_generated"].extend(f"c6/{name}" for name in c6_summary["outputs"])
+        candidate_summary = build_candidates(
+            selected_rate_paths, manifest_path, c5_dir / "c5_provider_locations.csv",
+            c5_dir / "c5_evidence.csv", out_dir / "c6",
+        )
+        summary_metrics["c6_candidate_summary"] = candidate_summary
+        summary_metrics["deliverables_generated"].extend(
+            f"c6/{name}" for name in (
+                "c6_supported_rate_candidates.csv", "c6_candidate_evidence.csv",
+                "c6_candidate_evidence.json", "c6_candidate_review.csv",
+                "c6_candidate_summary.json"))
+        summary_metrics["downstream_validation_status"] = (
+            "C5/C6 use sourced evidence. Strict verified rates require exact PPO and TIN/site proof; "
+            "separate research candidates have corroborated addresses but require directory/roster review."
+        )
+        if 0 < c6_summary["counts"].get("exported_rate_rows", 0) <= 250_000:
+            final_rate_df = pd.read_csv(out_dir / "c6" / "c6_verified_rates.csv", dtype={"NPI": str, "TIN": str})
+            cost_df = CostEffectivenessEngine().evaluate_cost_effectiveness(final_rate_df)
+            cost_path = out_dir / "provider_cost_effectiveness_benchmark.csv"
+            cost_df.to_csv(cost_path, index=False)
+            summary_metrics["challenges_executed"].append("C7")
+            summary_metrics["deliverables_generated"].append(cost_path.name)
+    else:
+        logger.warning("C5 skipped: supply NPPES main/secondary files and snapshot date; no address or PPO rate deliverable is fabricated")
 
     # =========================================================================
     # GENERATE MASTER DELIVERABLES: Logic File & Summary File
@@ -362,7 +316,7 @@ def run_pipeline(
     summary_md_content = f"""# Executive Run Summary: Centene CA Commercial PPO Rate Curation
 **Pursuant to Centene California Commercial-Group PPO Classification Plan**
 
-**Validation scope:** C2 classifies all four indexed brands using official 2026 EOCs, CMS plan attributes, carrier family evidence, and review rules. C3/C4 consume only the Health Net California group handoff. Provider membership is unverified. C3 and C4 audit complete source MRFs. C4 output is in `c4/c4_manifest.csv` and per-file audit CSVs. C5 uses synthetic address seed rows and at most 10,000 C4-selected rows; C5–C7 figures below are demonstration results, not verified submission metrics.
+**Validation scope:** C2 classifies the supplied indexes; C3/C4 audit complete selected MRFs. A PPO-linked shared MRF does not establish provider membership or PPO-specific rates. C5 runs only when real NPPES inputs are supplied and reports evidence statuses separately. C6 exports only rows meeting the exact PPO site, direct TIN/site, and attributable-rate gates; withheld rows remain auditable.
 
 - **Execution Date**: {start_time.strftime('%Y-%m-%d %H:%M:%S UTC')}
 - **Target Snapshot Date**: {TARGET_SNAPSHOT_DATE}
@@ -393,22 +347,26 @@ def run_pipeline(
 | **C3: File Quality** | **Complete-file grades** | **{', '.join(f"{r['file_name']}: {r['composite_fqs'] if r['composite_fqs'] is not None else 'not graded'} ({r['grade']})" for r in quality_results)}** | See per-file counts and limitations in file_quality_details.json |
 | **C4: Rates Curation** | Expanded Rate Rows Audited | {summary_metrics['raw_rates_extracted_count']:,} | Complete selected MRFs; all decisions in `c4/` |
 | | Selected Direct Professional FFS Rates | {summary_metrics['curated_rates_count']:,} | Actual lower-median published rate per exact service context; alternatives preserved |
-| **C5: Address Resolution** | Unique In-Network NPIs | {summary_metrics['unique_npis_count']:,} | Type 1 Individuals & Type 2 Organizations |
-| | Unique Contracted TINs | {summary_metrics['unique_tins_count']:,} | Medical groups and health systems |
-| | Unique Verified Practice Sites | {summary_metrics['unique_addresses_count']:,} | Physical addresses (PO Boxes strictly rejected) |
-| | **Demonstration address association** | **{summary_metrics['share_npis_verified_address']}%** | Synthetic seed rows; independent practice-address verification still required |
+| **C5: Address Resolution** | Unique C4 NPIs evaluated | {summary_metrics['unique_npis_count']:,} | Source-file providers; PPO membership assessed separately |
+| | Unique C4 TINs evaluated | {summary_metrics['unique_tins_count']:,} | TIN/site relationship requires direct evidence |
+| | Unique physical address candidates | {summary_metrics['unique_addresses_count']:,} | Format-filtered candidates, not automatically verified |
+| | NPIs with a corroborated practice site | {summary_metrics['share_npis_corroborated_site']}% | Independent or direct practice-site evidence |
+| | **NPIs with verified NPI/TIN/PPO site link** | **{summary_metrics['share_npis_verified_address']}%** | Direct TIN/site and exact PPO/site evidence both required |
+| **C6: Research candidates** | Six-column published-rate candidate rows | {summary_metrics.get('c6_candidate_summary', {}).get('counts', {}).get('exported_candidate_rows', 0):,} | One TIN, one corroborated CA site, one unambiguous rate; exact PPO/site and TIN/site unverified |
 
 ## Deliverables & Audit Files Generated
 
-1. `Centene_CA_Commercial_PPO_Provider_Rates.xlsx` (Deliverable 1: Final Provider Rate File)
-2. `Logic_File.md` (Deliverable 2: Logic for Network ID and Address Mapping)
-3. `File_Quality_Metrics.md` & `file_quality_scorecard.csv` (Deliverable 3: Quality Metrics & Scores)
-4. `Summary_Metrics.json` & `Summary_Metrics.md` (Deliverable 4: Summary Metrics)
-5. `plan_decisions.csv` (C2 Plan Decisions with Product and Network Statuses)
-6. `file_manifest.csv` (C2 Rate File Manifest with MIXED classification)
-7. `review_queue.csv` (C2 Unresolved Review Queue)
-8. `provider_cost_effectiveness_benchmark.csv` (Deliverable 7: C7 Cost Effectiveness)
-9. `c4/c4_manifest.csv` and per-file C4 audit CSVs (complete source-file rate extraction)
+1. `c6/Centene_CA_Commercial_PPO_Provider_Rates.xlsx` if C5 inputs are supplied (strict verified rate file; may have zero rows)
+2. `c6/c6_supported_rate_candidates.csv` and `c6/c6_candidate_evidence.csv` (research candidates and row-level provenance; Excel conversion documented in README)
+3. `Logic_File.md` (Deliverable 2: Logic for Network ID and Address Mapping)
+4. `File_Quality_Metrics.md` & `file_quality_scorecard.csv` (Deliverable 3: Quality Metrics & Scores)
+5. `Summary_Metrics.json` & `Summary_Metrics.md` (Deliverable 4: Summary Metrics)
+6. `plan_decisions.csv` (C2 Plan Decisions with Product and Network Statuses)
+7. `file_manifest.csv` (C2 Rate File Manifest with MIXED classification)
+8. `review_queue.csv` (C2 Unresolved Review Queue)
+9. `provider_cost_effectiveness_benchmark.csv` only when verified C6 rows are available (Deliverable 7)
+10. `c4/c4_manifest.csv` and per-file C4 audit CSVs (complete source-file rate extraction)
+11. `c5/c5_provider_locations.csv`, `c5/c5_evidence.csv`, `c5/c5_review_queue.csv`, and `c5/c5_summary.json` when C5 is run
 """
     summary_md_path = out_dir / "Summary_Metrics.md"
     summary_md_path.write_text(summary_md_content, encoding="utf-8")
@@ -459,7 +417,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Master PTD Curation Pipeline")
     parser.add_argument("--index", type=Path, action="append", help="Path to local index JSON file (repeatable)")
     parser.add_argument("--rate-file", type=Path, action="append", help="Path to local in-network rate file")
-    parser.add_argument("--nppes", type=Path, help="Path to local NPPES CSV extract")
+    parser.add_argument("--nppes", type=Path, help="NPPES V2 monthly main CSV")
+    parser.add_argument("--nppes-secondary", type=Path, help="NPPES V2 monthly non-primary practice locations CSV")
+    parser.add_argument("--nppes-monthly-through", type=date.fromisoformat, help="NPPES monthly snapshot through date")
+    parser.add_argument("--nppes-weekly-main", type=Path)
+    parser.add_argument("--nppes-weekly-secondary", type=Path)
+    parser.add_argument("--nppes-weekly-through", type=date.fromisoformat)
+    parser.add_argument("--nppes-deactivations", type=Path)
+    parser.add_argument("--nucc", type=Path, help="NUCC taxonomy CSV")
+    parser.add_argument("--cms-clinicians", type=Path, help="Dated CMS Doctors and Clinicians CSV")
+    parser.add_argument("--cms-snapshot", type=date.fromisoformat, help="Publication date if CMS CSV rows lack source_date")
+    parser.add_argument("--payer-directory", type=Path, help="Dated, plan-filtered Health Net evidence CSV")
+    parser.add_argument("--payer-snapshot", type=date.fromisoformat, help="Directory snapshot date if CSV rows lack source_date")
+    parser.add_argument("--provider-roster", type=Path, help="Dated, provider/group-confirmed evidence CSV")
+    parser.add_argument("--roster-snapshot", type=date.fromisoformat, help="Roster snapshot date if CSV rows lack source_date")
+    parser.add_argument("--ppo-directory-plan", action="append", help="Exact plan/network name in payer-directory evidence")
+    parser.add_argument("--ppo-rate-attribution", action="append", help="Explicit C4 plan_attribution accepted for C6")
     parser.add_argument("--output-dir", type=Path, default=DELIVERABLES_DIR, help="Deliverables output directory")
     parser.add_argument("--all-codes", action="store_true", help="Legacy option; C4 always processes all codes")
     parser.add_argument("--as-of", type=date.fromisoformat, help="C3/C4 reference date (YYYY-MM-DD)")
@@ -471,6 +444,21 @@ if __name__ == "__main__":
         index_files=args.index,
         rate_files=args.rate_file,
         nppes_file=args.nppes,
+        nppes_secondary=args.nppes_secondary,
+        nppes_monthly_through=args.nppes_monthly_through,
+        nppes_weekly_main=args.nppes_weekly_main,
+        nppes_weekly_secondary=args.nppes_weekly_secondary,
+        nppes_weekly_through=args.nppes_weekly_through,
+        nppes_deactivations=args.nppes_deactivations,
+        taxonomy_file=args.nucc,
+        cms_clinicians_file=args.cms_clinicians,
+        cms_snapshot=args.cms_snapshot,
+        payer_directory_file=args.payer_directory,
+        payer_snapshot=args.payer_snapshot,
+        provider_roster_file=args.provider_roster,
+        roster_snapshot=args.roster_snapshot,
+        ppo_directory_plans=args.ppo_directory_plan,
+        ppo_rate_attributions=args.ppo_rate_attribution,
         output_dir=args.output_dir,
         limit_codes=not args.all_codes,
         as_of=args.as_of,

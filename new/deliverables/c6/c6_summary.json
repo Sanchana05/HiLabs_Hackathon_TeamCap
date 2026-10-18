@@ -1,0 +1,14 @@
+{
+  "counts": {
+    "selected_c4_rows": 14443,
+    "withheld_unattributed_rate_rows": 14443
+  },
+  "allowed_plan_attributions": [],
+  "outputs": [
+    "c6_verified_rates.csv",
+    "Centene_CA_Commercial_PPO_Provider_Rates.xlsx",
+    "c6_rate_context_audit.csv",
+    "c6_ambiguous_projection.csv"
+  ],
+  "rule": "Requires corroborated site, direct TIN/site evidence, exact PPO directory hit, and PPO-only rate attribution; ambiguous context projections withheld."
+}

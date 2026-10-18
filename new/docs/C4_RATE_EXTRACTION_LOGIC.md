@@ -41,4 +41,4 @@ Alternatively repeat `--file path/to/file.json.gz`. The Python port is `run_file
 
 ## Gates and interpretation
 
-The full master runner executes C4 after C3 and records C4's complete counts. The existing C5–C7 stages consume at most 10,000 selected rows for their explicitly labeled demonstration output; this cap does not affect C4 files. Do not label C4 rows as PPO-network rates until the C1/C2 attribution and plan-specific provider evidence are repaired.
+The full master runner executes C4 after C3 and records C4's complete counts. C5 takes the full selected-rate CSV as its input. Do not label C4 rows as PPO-network rates until the C1/C2 attribution and plan-specific provider evidence are established.

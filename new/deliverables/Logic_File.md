@@ -58,149 +58,113 @@ python -m unittest discover -s new/tests -p test_c2_network_mapper.py -v
 
 Use `--index-dir` for another directory, repeated `--index` arguments for explicit files, or `--evidence` for a reviewed Health Net evidence register. `c2_summary.json` records input index and all evidence SHA-256 hashes. The 11 supplied indexes are versioned under `data/indexes`; the much larger rate MRF remains a local input.
 
----
-
-# Challenge C5: PTD TIN and NPI to Practicing Address Mapping Logic
-
-## 1. Executive Summary & The Core Dilemma
-
-In Price Transparency Data (PTD), rates are contracted at the **(NPI, TIN, Billing Code)** level. The CMS schema contains **zero address fields, zero provider names, and zero clinical specialties**. 
-
-To make this data usable for a payer contracting team (Deliverable 1), every rate record must be linked to the provider's **actual practicing address and clinical specialty**.
-
-However, relying solely on the federal **National Plan and Provider Enumeration System (NPPES)** introduces fatal data errors:
-- **~80% Stale or Inaccurate Practice Addresses**: When physicians apply for an NPI (often during medical residency or early fellowship), they register an address that is rarely updated throughout their multi-decade careers.
-- **Mailing Clearinghouses & Corporate HQs**: A huge percentage of NPPES records list third-party billing clearinghouses, accountants, out-of-state administrative headquarters, or Post Office Boxes rather than physical treatment facilities.
-- **The One-to-Many TIN Complexity**: A single Tax Identification Number (TIN) represents a healthcare legal entity (e.g., a regional medical group or hospital system) that may operate 30 distinct clinic locations across California. Conversely, a single traveling physician (NPI) may practice across multiple facilities.
-
-To solve this problem and satisfy the **40-point Logic evaluation criteria**, we engineered a multi-stage **Entity Triangulation and Network Consensus Engine** inspired by the HiLabs R3 (Reliability, Relevance, Recency) framework.
 
 ---
 
-## 2. Source Data Architecture
+# C4: Complete-file rate extraction and auditable selection
 
-1. **PTD In-Network Rate Files**: Extracted tuples of $\langle \text{NPI}, \text{TIN}, \text{billing\_code}, \text{rate} \rangle$.
-2. **CMS NPPES California Registry Extract**: 
-   - Entity Type 1 (Individual Physicians/Surgeons) and Entity Type 2 (Organizational Clinics/Facilities).
-   - Primary and Secondary Practice Location Addresses.
-   - Provider Business Mailing Addresses.
-   - Healthcare Provider Taxonomy Codes (10-character alphanumeric).
-   - Record Last Update Timestamps.
-3. **National Uniform Claim Committee (NUCC) Code Set**: Official hierarchical crosswalk mapping taxonomy codes to clinical classification and specialty.
-4. **USPS Publication 28 (Postal Addressing Standards)**: National standards for street abbreviations, directional indicators, and secondary unit normalization.
+## Contract and scope
 
----
+C4 accepts one or more local CMS Transparency in Coverage in-network files through `RateFileInput`, repeated `--file`, or a C2 `file_manifest.csv` plus `--rate-dir`. Optional C3 details bind each input to its SHA-256 and quality status. C4 processes every `in_network` item and every published price; it has no code or row cap. Files can be JSON or JSON.gz. Its temporary SQLite state is disk-backed and removed after a successful or failed run.
 
-## 3. The Multi-Stage Address Triangulation Protocol
+The unit of output is a **file rate**, never a verified PPO contract. A `MIXED` file yields `plan_attribution=SHARED_FILE_UNRESOLVED`; all other files yield `UNVERIFIED_NETWORK_MEMBERSHIP`. A later network-attribution component can join verified plan/provider evidence using the source file ID and NPI/TIN keys without changing C4's extraction.
 
-```
-         PTD IN-NETWORK RATES                     CMS CALIFORNIA NPPES EXTRACT
-         (NPI, TIN, Code, Rate)                   (NPI, Entity Type, Taxonomy, Addresses)
-                   │                                                │
-                   └───────────────────────┬────────────────────────┘
-                                           │
-                                  [NPI Primary Join]
-                                           │
-                        ┌──────────────────┴──────────────────┐
-                        ▼                                     ▼
-             [Stage 1: USPS Standardizer]         [Stage 4: NUCC Specialty Mapper]
-             - Normalize street suffixes           - Map 10-char taxonomy code
-             - Normalize secondary units           - Output standardized specialty
-             - Reject PO Boxes / Drops               (e.g., "Orthopaedic Surgery")
-                        │
-                        ▼
-             [Stage 2: Physical vs Mailing]
-             - Prioritize Practice Location
-             - Discard out-of-state addresses
-                        │
-                        ▼
-             [Stage 3: TIN Network Consensus]
-             - Cluster all NPIs under same TIN
-             - Calculate address co-occurrence
-             - Corroborate physical facility
-                        │
-                        ▼
-             [Stage 5: Address Confidence Scorer]
-             - Calculate ACS (0 to 100)
-             - Assign Confidence Tier (HIGH / MOD)
-                        │
-                        ▼
-             CURATED PROVIDER RATE DELIVERABLE
-             (NPI, TIN, Address, Code, Specialty, Rate)
+## Published schema versus our selection policy
+
+[CMS's in-network field guide](https://github.com/CMSgov/price-transparency-guide/blob/master/schemas/in-network-rates/README.md) defines five `negotiated_type` values and distinguishes dollar amounts from whole-number percentages. It makes `billing_class`, `setting`, and (for professional rates) `service_code` relevant, and permits code modifiers, bundled arrangements, `CSTM-00` wildcards, and `9999-12-31` when no expiration is stated. C4 follows those definitions. HiLabs' [public roster-automation paper](https://www.hilabs.com/new-website/pdf/Beyond_Standardization-Maximizing_Value_through_End-to-End_Roster_Automation.pdf) discusses provider-data validation, but gives no published rule for choosing between conflicting TiC negotiated prices. The rate-selection policy below is therefore our explicit analytic policy, **not a HiLabs or CMS mandated preference**.
+
+1. Stream `provider_references` into SQLite, then stream `in_network` items and expand each direct/referenced provider group into NPI/TIN associations. The reference pass handles either top-level JSON property order. Expand every listed service code independently.
+2. Validate presence and syntax of item identity, arrangement, negotiated type, amount, billing class, setting, expiration, service code, and provider keys. Normalize a valid hyphenated EIN to nine digits in `tin`, retaining the original spelling in `tin_raw`. Reject missing/unknown provider links, zero, nonnumeric or unrepresentable rates, expired rows (relative to required `--as-of`), and malformed fields. Preserve each rejected row and its reason. `npi: [0]` is an unknown NPI, so cannot be selected as a provider-level rate.
+3. Keep valid nonbenchmark rates in the decision file. This includes `derived`, `fee schedule`, `percentage`, `per diem`, institutional/both billing, bundles/capitation, and `CSTM-00`. The `rate_unit` column distinguishes percent, USD per day, and USD. A `VALID_NON_BENCHMARK` decision means the rate was parsed and validated; it does not convert a percentage or per-day amount into a service-dollar benchmark.
+4. For **professional, fee-for-service, negotiated dollar** rates with a concrete billing and service code, partition by source file, NPI, TIN type/value, code type/version, code, item name/description, arrangement, negotiated type, billing class, setting, service code, modifiers, bundle contents, covered services, and additional information. These fields are retained because collapsing across them could conflate different services or contracts.
+5. Remove exact published duplicates in that context, retaining the duplicate row and reason in the decision file. If one candidate remains, select it. If several distinct published candidates remain, select the **lower median observed candidate** by numeric amount, then source order. The selected amount is always an actual published rate; C4 never calculates and outputs a synthetic median. Alternates remain in the decision file and are **not** claimed to be inactive or wrong. Without plan-tier or contract evidence, the chosen row is a representative benchmark, not the uniquely applicable reimbursement.
+
+Expiration is used to reject dates before the as-of date. A later expiration does **not** prove a newer or more applicable contract. `9999-12-31` is preserved as `NO_STATED_EXPIRY`, not claimed to be an active contract. We do not prefer POS 11 over another place of service: distinct settings remain distinct outputs.
+
+C4 does not impose an arbitrary maximum dollar rate: an unusually high published amount remains traceable and can be reviewed with C3's outlier metric or an external benchmark. A positive amount alone does not establish that a contract is active or applies to the target PPO.
+
+## Outputs and interfaces
+
+`c4_manifest.csv` has one row per input and relative paths. Each file gets a stable directory named by a hash of the source URL (or filename):
+
+- `selected_rates.csv`: one published benchmark candidate per exact context; includes `rate`, source locator, `rates_considered_count`, and `decision_reason`.
+- `rate_decisions.csv`: every expanded rate row, including invalid, valid nonbenchmark, exact duplicates, selected, and alternate candidates. An alternate points to `selected_source_locator`.
+- `c4_summary.json`: SHA-256, source URL, as-of date, C3 status, file classification, attribution limitation, policy, and reconciled counts.
+
+CSV is the interchange contract for C5/C6 and later network evidence. NPI and TIN must be read as strings. No raw MRF or temporary SQLite database is committed.
+
+Run from the repository root after downloading the files:
+
+```powershell
+$env:PYTHONPATH = "new"
+python -m pipeline.c4_rate_extractor.rate_extractor --manifest outputs/pipeline-smoke/file_manifest.csv --rate-dir data/ratefiles --c3-details new/deliverables/file_quality_details.json --as-of 2026-10-18 --output-dir outputs/c4
 ```
 
----
+Alternatively repeat `--file path/to/file.json.gz`. The Python port is `run_files([RateFileInput(path, source_url, file_classification, expected_sha256, c3_quality_status)], output_dir, as_of=date(...))`.
 
-### Stage 1: USPS CASS-Compliant Address Standardization & Noise Rejection
-Raw address text across healthcare datasets suffers from severe formatting entropy (e.g., "Ste 200", "Suite #200", "Floor 2", "St.", "Street").
-1. **Token Standardization**: Normalizes street suffixes (`AVENUE` $\rightarrow$ `AVE`, `BOULEVARD` $\rightarrow$ `BLVD`, `SUITE` $\rightarrow$ `STE`, `BUILDING` $\rightarrow$ `BLDG`) and directional prefixes (`NORTH` $\rightarrow$ `N`).
-2. **PO Box & Virtual Drop Rejection**: A physician cannot render physical healthcare services inside a Post Office Box. The normalizer runs word-boundary regexes (`\b(?:P\.?O\.?\s*BOX|POST\s+OFFICE\s+BOX|PMB\s+\d+)\b`) and immediately rejects PO Boxes from physical practicing consideration.
-3. **California ZIP Boundary Enforcement**: Validates that 5-digit postal codes fall strictly within California's statutory geographic boundaries (`90001` through `96162`).
+## Gates and interpretation
 
----
+The full master runner executes C4 after C3 and records C4's complete counts. C5 takes the full selected-rate CSV as its input. Do not label C4 rows as PPO-network rates until the C1/C2 attribution and plan-specific provider evidence are established.
 
-### Stage 2: Dual NPPES Evaluation (Physical Practice vs Mailing Location)
-NPPES contains two separate address blocks for every provider:
-- `Provider Business Practice Location Address`: The statutory location where medical services are rendered.
-- `Provider Business Mailing Address`: The administrative correspondence address.
-
-**Disambiguation Logic**:
-- The engine prioritizes the **Practice Location Address**.
-- If the Practice Location Address is missing or flagged as a PO Box, the Mailing Address is inspected. If the Mailing Address is a physical commercial address within California, it is retained with a flagged audit status; otherwise, it is rejected.
 
 ---
 
-### Stage 3: Multi-Provider TIN Co-occurrence Consensus Clustering
-*This is the mathematical core that solves the 80% stale address problem.*
+# C5: Evidence-backed NPI/TIN/practice-site mapping
 
-* **The Concept**: A Tax ID Number (TIN) represents the legal operating entity (medical group, health system, or clinic). While an individual physician’s NPPES record is frequently outdated, a medical group has multiple affiliated clinicians billing under the same TIN.
-* **The Consensus Algorithm**:
-  For every distinct TIN in the PTD rate dataset, we construct an address co-occurrence graph across all affiliated NPIs:
-  $$\text{TIN Address Counts} = \left\{ A_j : \text{count}(A_j) \mid A_j \in \text{Standardized Practice Addresses of NPIs billing under TIN} \right\}$$
-  $$\text{Consensus Ratio } C(A_j) = \frac{\text{count}(A_j)}{\sum_{k} \text{count}(A_k)}$$
-* **The Insight**: When 15 out of 20 physicians billing under TIN $X$ report `"200 UCLA MEDICAL PLZ STE 220, LOS ANGELES, CA 90095"`, that physical address has an overwhelming **$75\%$ network consensus** as the active operating site for that TIN. 
-* By leveraging group-level consensus, we cross-validate and self-heal stale or incomplete addresses for individual physicians in the network.
+## Scope and core rule
 
----
+The C4 rate rows provide an NPI and a TIN but no practice address. The selected Health Net MRF currently has `file_classification=MIXED` and `plan_attribution=SHARED_FILE_UNRESOLVED`: a rate or provider in that file cannot automatically be attributed to the California commercial group PPO.
 
-### Stage 4: NUCC Taxonomy to Clinical Specialty Crosswalk
-Deliverable 1 mandates an exact **`Specialty`** column. CMS TiC files contain no provider specialties.
-1. The resolver extracts the primary 10-character alphanumeric taxonomy code from NPPES (`Healthcare Provider Taxonomy Code_1`).
-2. The code is mapped against the **National Uniform Claim Committee (NUCC)** classification tree:
-   - `207Q00000X` $\longrightarrow$ **Family Medicine**
-   - `207R00000X` $\longrightarrow$ **Internal Medicine**
-   - `207X00000X` $\longrightarrow$ **Orthopaedic Surgery**
-   - `207RC0000X` $\longrightarrow$ **Cardiovascular Disease**
-   - `2085R0202X` $\longrightarrow$ **Diagnostic Radiology**
-   - `282N00000X` $\longrightarrow$ **General Acute Care Hospital**
-3. Type 2 organizational NPIs are enriched with facility classification (e.g., *"Primary Care Clinic"*, *"General Acute Care Hospital"*).
+C5 therefore makes **three separate decisions** for each `(NPI, TIN type, TIN, location)`:
 
----
+1. **Practice site** — `corroborated`, `candidate`, `conflicted`, or `unresolved`.
+2. **TIN/site link** — `proven` only when a current payer or provider/group record explicitly contains the same TIN and site; otherwise `unproven`.
+3. **PPO/site participation** — `confirmed` only for a current payer record matching the NPI, physical location, exact configured PPO plan/network name, and plan year; `possible` for an exact-name result lacking current proof; otherwise `unknown`.
 
-### Stage 5: The Address Confidence Score (ACS) Engine
-To provide complete transparency for contracting executives, every matched address receives an **Address Confidence Score (ACS)** from $0.0$ to $100.0$:
+One provider may retain several location rows. A TIN with many providers may have several sites. Counts of peers sharing an address are never used to assign another provider to that address. NPPES-only addresses remain candidates even if the record was recently updated: its update timestamp is not an address-verification timestamp. The case statement's “about 80% stale” figure is a problem assumption, not a measured property of our extract.
 
-$$\text{ACS} = S_{\text{physical}} + S_{\text{geo}} + S_{\text{consensus}} + S_{\text{recency}}$$
+## Sources and contribution
 
-| Component | Max Points | Evaluation Criteria |
-| :--- | :---: | :--- |
-| **Physical Integrity ($S_{\text{physical}}$)** | **30** | $+30$ if confirmed physical street address. Rejection ($0$) if PO Box. |
-| **Geographic Validity ($S_{\text{geo}}$)** | **25** | $+25$ if valid California municipality and ZIP in range [90001–96162]. |
-| **TIN Network Consensus ($S_{\text{consensus}}$)** | **30** | Proportion of affiliated TIN providers sharing this location. Solo practice receives $+20$. |
-| **Primary Practice Recency ($S_{\text{recency}}$)** | **15** | $+15$ if verified from primary practice location block with active license. |
+| Source | Role | Limitation |
+| --- | --- | --- |
+| C4 selected rates | Set of in-scope `(NPI, TIN type, TIN)` pairs and MRF provenance | No address or PPO-specific provider membership |
+| NPPES V2 monthly primary and separate non-primary practice-location file | Type 1/2 identity, taxonomy, physical site candidates | Does not validate that a clinician currently practices at a site or is credentialed |
+| NPPES overlapping weekly and deactivation data | Replace newer NPI records only when the weekly snapshot is later; flag deactivated NPIs | The weekly release overlapping the monthly snapshot is skipped to avoid duplicate support |
+| NUCC taxonomy CSV | Standard specialty display name for the designated primary taxonomy | Taxonomy does not verify current specialty or service site |
+| CMS Doctors and Clinicians national file | Independent NPI/site corroboration for Medicare-enrolled clinicians | Not a commercial PPO roster and not a PTD TIN crosswalk |
+| Health Net commercial group PPO directory evidence | Exact plan/NPI/site confirmation, when a dated record can be obtained | No bulk/API route for this product has been established in the supplied materials; directory may not expose TIN or every provider |
+| Provider/group-confirmed roster | Independent current site evidence; explicit TIN/site link if present | Requires an attributable, dated, authorized source |
 
-**Confidence Tiers**:
-- **HIGH (ACS $\ge 80.0$)**: Verified physical California site with multi-provider consensus.
-- **MODERATE (60.0 $\le$ ACS $< 80.0$)**: Valid physical site; solo provider or partial consensus.
-- **LOW / PROVISIONAL (ACS $< 60.0$)**: Requires directory verification.
+NPPES [distributes secondary practice locations separately](https://download.cms.gov/nppes/NPI_Files.html) and says NPI issuance does not validate credentialing. CMS [publishes clinician/enrollment/group/address rows](https://data.cms.gov/provider-data/dataset/mj5m-pzi6). Health Net's [provider search](https://findaprovider.healthnetcalifornia.com/) is plan-filtered and updated more frequently than print, but its availability does not imply a public commercial group PPO API. The [CMS Provider Directory API FAQ](https://www.cms.gov/initiatives/burden-reduction/overview/interoperability/frequently-asked-questions/provider-directory-api) addresses other regulated products; it does not establish one for this PPO.
 
----
+## Repeatable transformation
 
-## 4. Conflict Resolution & Edge Cases
+1. Stream every C4 `selected_rates.csv` into a disk-backed distinct provider-pair table. Keep TIN type, TIN as text, and C4 file IDs.
+2. Stream the NPPES V2 main CSV using only needed column indexes; read its non-primary location file separately. Reconcile weekly updates only if their through-date is later than the monthly snapshot. Read the deactivation report. Select only NPIs present in C4. Type 1 and Type 2 both remain in scope.
+3. Ingest any supplied CMS, payer, and provider/group evidence CSV. Each observation retains source, record locator, date, raw and normalized address, identity, plan name/year, and TIN when directly present.
+4. Normalize common street suffixes, directional tokens, city, and ZIP to group the *same* site. Reject PO boxes as physical sites. Preserve suites; different suites in the same building trigger review in the absence of direct current evidence. This token normalizer is **not CASS or DPV certification** and does not assert deliverability.
+5. Group observations by exact NPI and normalized location. NPPES primary and secondary observations are a single source family, not two independent votes. A current payer or provider/group confirmation, or current CMS clinician data agreeing with NPPES, can corroborate a site. A wrong-plan directory record never confirms this PPO. A deactivated NPI cannot yield a corroborated site. Site conflicts remain in the review queue.
+6. Write `c5_provider_locations.csv`, `c5_evidence.csv`, `c5_review_queue.csv`, and `c5_summary.json`. An NPI with no valid site appears in the review queue with an empty address. The summary reports separate candidate, corroborated, TIN-link, and PPO-site coverage with clear NPI and pair denominators.
 
-| Conflict Scenario | Observed Manifestation | Applied Resolution Rule |
-| :--- | :--- | :--- |
-| **Multi-Facility Health Systems** | Large hospital system (single TIN) operates 10 distinct physical clinic addresses. | If an NPI's individual practice address matches one of the TIN's verified consensus clusters, bind to that specific clinic site. If unlisted, bind to the TIN's highest-volume primary clinical hub. |
-| **Provider with Multiple Addresses in NPPES** | NPPES lists Practice Location in San Diego and Mailing Address in Dallas, TX. | Reject Texas mailing address (out of market). Select California practice address. |
-| **Provider Moved / Missing from CA NPPES** | NPI contracted under Centene CA PPO but recent NPPES update shows move out of state. | Retain historical California practice location verified via TIN co-occurrence consensus, flag as `PROVISIONAL_HISTORICAL`. |
+The implementation is in `pipeline/c5_address_mapper/resolve.py`; `C5_IMPLEMENTATION_PLAN.md` records the original execution plan and acceptance cases.
+
+## C6 handoff and withholding rules
+
+`pipeline/c6_rate_builder/verified_builder.py` consumes all C4 selected files and the C5 location table. Its six-column Excel/CSV rate file admits a row only when:
+
+- the exact NPI/TIN/site is corroborated, the TIN/site link is proven, and the PPO/site is confirmed;
+- the C4 rate row has an explicitly allowed PPO-only `plan_attribution`, and its source file is not `MIXED`; and
+- exactly one C4 rate context projects to the requested `(NPI, TIN, address, billing code)` key.
+
+The complete admitted C4 contexts are retained in `c6_rate_context_audit.csv`. Multiple settings, modifiers, rate types, or other contexts that collapse to the same six-column key go to `c6_ambiguous_projection.csv`. When current evidence cannot clear the gates, an Excel file with headers and zero rows is the honest result. The current shared MRF cannot produce verified PPO-specific rates by itself.
+
+### Evidence-limited research candidates
+
+CMS [permits the same in-network MRF to serve multiple plans when negotiated data is common](https://www.cms.gov/files/document/transparency-coverage-8-steps-508.pdf). The C2 index therefore supports treating rates in this Health Net shared file as **PPO-linked published candidates**, while the MRF does not identify the service site or independently verify current plan participation for each NPI/TIN/site. This is a narrower assertion than a verified PPO contract row.
+
+`candidate_builder.py` writes a separate six-column candidate rate CSV and row-level evidence/review files. It admits only a C4 rate in a source URL linked by C2 to a confirmed California group PPO, for an NPI with exactly one C4 TIN and exactly one corroborated California site and no other plausible site candidate. It withholds conflicting code types or rates that would collapse into one six-column key. The Excel candidate workbook repeats the six required columns and carries `Evidence` and `Scope and sources` sheets explaining that TIN/site and exact PPO/site links remain unproven. The strict verified file is retained separately and remains empty until direct payer/roster evidence resolves those links.
+
+## Reproduction and review
+
+The README shows the standalone CLI and external evidence CSV schema. Input paths, monthly snapshot date, evaluation date, and exact PPO plan names are explicit. The standalone C5 command works while C2 is still running; the master runner calls the same function after C4. Tests cover multi-site NPI, shared TIN/different sites, wrong-plan record, direct TIN/site proof, PO-box-only unresolved case, and C6 ambiguous rate projection. This is evidence-based address mapping, not a claim that every provider has been verified.
 
