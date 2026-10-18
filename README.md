@@ -4,6 +4,14 @@
 
 See [IDEATION.md](IDEATION.md) for relevant tools, resources, and project ideas. Team members and agents working in this repository can add concise, sourced entries there.
 
+## Local data
+
+See [DATA_INVENTORY.md](DATA_INVENTORY.md) for the files inspected in this checkout. Large source files and extracted data under `data/` are kept out of Git, except the versioned index JSON files.
+
+## Pipeline
+
+See [new/README.md](new/README.md) for the C1–C7 pipeline, evidence requirements, submission artifacts, and rerun commands.
+
 ## C3 file-quality audit
 
 The complete-file grader and its methods are in [new/README.md](new/README.md) and [new/docs/C3_FILE_QUALITY_METRICS.md](new/docs/C3_FILE_QUALITY_METRICS.md). Install `requests`, `pandas`, and `ijson`. To reproduce the September 2026 Health Net input with the existing TOC downloader, run from the repository root:
