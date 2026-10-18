@@ -1,6 +1,6 @@
 # Integration validation
 
-Branch: `integration/full-pipeline`. After moving the active pipeline to the repository root, the full C1–C6 master command in the root README completed successfully with the local Centene MRF, monthly NPPES V2 main and secondary files, the NPPES deactivation report, NUCC taxonomy, and the dated CMS clinician extract. The run used `--as-of 2026-10-18` and wrote to ignored `outputs/full-run/`; its generated files were copied into `deliverables/`. Local input paths were passed as arguments because the large source files are excluded from Git.
+Branch: `integration/full-pipeline`. After moving the active pipeline to the repository root, the full C1–C6 master command in the root README completed successfully with the local Centene MRF, monthly NPPES V2 main and secondary files, the NPPES deactivation report, NUCC taxonomy, and the dated CMS clinician extract. The run used `--as-of 2026-10-18` and wrote to ignored `outputs/full-run/`. Four reviewed submission files are in `deliverables/`; supporting generated files are in `audit/`. Local input paths were passed as arguments because the large source files are excluded from Git.
 
 | Check | Result |
 | --- | ---: |

@@ -36,7 +36,7 @@ From the repository root, after installing `ijson`, run:
 
 ```powershell
 $env:PYTHONPATH = "new"
-python -m pipeline.c3_file_grader.file_grader --manifest deliverables/file_manifest.csv --rate-dir data/ratefiles --output-dir outputs/c3 --as-of 2026-10-18
+python -m pipeline.c3_file_grader.file_grader --manifest audit/file_manifest.csv --rate-dir data/ratefiles --output-dir outputs/c3 --as-of 2026-10-18
 python -m unittest discover -s tests -v
 ```
 

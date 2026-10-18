@@ -6,9 +6,9 @@ data/*
 data/indexes/*
 !data/indexes/*_index.json
 cache/
-deliverables/c4/
-deliverables/c5/*.sqlite
-deliverables/c6/*.sqlite
+audit/c4/
+audit/c5/*.sqlite
+audit/c6/*.sqlite
 outputs/
 ratefiles/
 NPPES_*.zip

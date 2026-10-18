@@ -6,18 +6,16 @@ This repository parses Centene Transparency in Coverage indexes, identifies Cali
 
 ## Submission files
 
-All current submission artifacts are in [deliverables](deliverables/README.md).
+The flat [deliverables](deliverables) folder contains exactly the four files requested in the problem statement. Supporting run outputs, the strict verified workbook, and the video script are in [audit](audit/README.md).
 
 | Requirement | File | Current result |
 | --- | --- | --- |
-| Six-column Excel rate file | [Rate candidates](deliverables/Centene_CA_Commercial_PPO_Rate_Candidates.xlsx) | 220 published-rate research candidates, with evidence and scope sheets; PPO/site and TIN/site links remain unverified. |
-| Strict PPO rate export | [Verified workbook](deliverables/c6/Centene_CA_Commercial_PPO_Provider_Rates.xlsx) | Header only: zero rows satisfy every evidence gate. |
-| Logic | [Logic file](deliverables/Logic_File.md) | Network, rate, and address rules. |
-| File quality | [Quality metrics](deliverables/File_Quality_Metrics.md) and [scorecard](deliverables/file_quality_scorecard.csv) | Complete-file grade B, 83.33; review required. |
-| Summary | [Summary metrics](deliverables/Summary_Metrics.md) and [JSON](deliverables/Summary_Metrics.json) | C1–C6 counts and limitations. |
-| Video | [Recording script](deliverables/VIDEO_SCRIPT.md) | Recording still required; no video is represented as delivered. |
+| Rate file (Excel) | [Centene_CA_Commercial_PPO_Rate_Candidates.xlsx](deliverables/Centene_CA_Commercial_PPO_Rate_Candidates.xlsx) | 220 published-rate research candidates. The workbook discloses that PPO/site and TIN/site links remain unverified. |
+| Logic file | [Logic_File.md](deliverables/Logic_File.md) | Network, rate, and address rules. |
+| File quality metrics | [File_Quality_Metrics.md](deliverables/File_Quality_Metrics.md) | C3 methodology and scores. |
+| Summary file | [Summary_Metrics.md](deliverables/Summary_Metrics.md) | C1–C6 run counts and limitations. |
 
-The optional C7 benchmark is withheld until a verified C6 rate exists. [Project scorecard](deliverables/Project_Evaluation_Scorecard.md) tracks candidate coverage and verified yield separately.
+The [strict verified workbook](audit/c6/Centene_CA_Commercial_PPO_Provider_Rates.xlsx) has headers only because zero rows pass every evidence gate. The optional C7 benchmark is withheld until a verified C6 rate exists. The [project scorecard](audit/Project_Evaluation_Scorecard.md) tracks candidate coverage and verified yield separately. The [video script](audit/VIDEO_SCRIPT.md) is ready; no video recording has been delivered.
 
 ## Reproduce the pipeline
 
@@ -57,7 +55,7 @@ python -m pipeline.run_pipeline `
   --output-dir outputs/full-run
 ```
 
-The command creates `outputs/full-run/Centene_CA_Commercial_PPO_Rate_Candidates.xlsx` **as part of the run**, alongside `outputs/full-run/c6/Centene_CA_Commercial_PPO_Provider_Rates.xlsx`, logic, quality, summary, and C1–C6 audit files. The output directory is ignored by Git so reruns do not silently change the committed submission. To refresh the submission after reviewing a rerun, use `--output-dir deliverables` and commit its generated files. A different snapshot may produce different counts.
+The command creates `outputs/full-run/Centene_CA_Commercial_PPO_Rate_Candidates.xlsx` **as part of the run**, alongside `outputs/full-run/c6/Centene_CA_Commercial_PPO_Provider_Rates.xlsx`, logic, quality, summary, and C1–C6 audit files. The output directory is ignored by Git so reruns do not silently change the committed submission. After reviewing a future run, copy only the four named submission files into `deliverables/`; place supporting audit outputs in `audit/`. Never direct the full runner at `deliverables/`, which is reserved for the four-file submission. A different snapshot may produce different counts.
 
 Validate the workbook and run the tests:
 
@@ -80,4 +78,4 @@ python -m pytest tests -q
 4. **C6:** Export corroborated-site **candidates** and strictly verified rates separately. Verified rows require direct TIN/site and exact PPO/site evidence plus rate attribution. The current Health Net MRF is `MIXED`, so it yields no verified PPO rates.
 5. **C7:** Produce cost-effectiveness rankings only when verified rates exist.
 
-See [the methodology](docs/PIPELINE_GUIDE.md), [full-run validation](docs/INTEGRATION_VALIDATION.md), and [historical code and outputs](legacy/README.md). The active submission is in `pipeline/`, `config/`, `tests/`, `tools/`, `evidence/`, and `deliverables/`.
+See [the methodology](docs/PIPELINE_GUIDE.md), [full-run validation](docs/INTEGRATION_VALIDATION.md), [supporting audit files](audit/README.md), and [historical code and outputs](legacy/README.md). The active submission is in `pipeline/`, `config/`, `tests/`, `tools/`, `evidence/`, `audit/`, and `deliverables/`.

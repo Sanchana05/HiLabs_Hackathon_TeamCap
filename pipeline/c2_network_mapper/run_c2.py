@@ -10,7 +10,7 @@ import pandas as pd
 
 from pipeline.c1_index_parser.index_parser import CenteneIndexParser
 from pipeline.c2_network_mapper.verify_ppo_network import PPOVerificationEngine
-from pipeline.config import DELIVERABLES_DIR, RAW_INDEX_DIR, REPO_ROOT
+from pipeline.config import RAW_INDEX_DIR, REPO_ROOT
 
 
 def run(index_paths: list[Path], output_dir: Path, evidence_path: Path | None = None,
@@ -75,7 +75,7 @@ def main() -> None:
     parser.add_argument("--evidence", type=Path, help="Versioned 2026 Health Net EOC register")
     parser.add_argument("--cms-reference", type=Path, help="Versioned 2026 CMS Plan Attributes PUF extract")
     parser.add_argument("--ambetter-eocs", type=Path, help="Versioned 2026 California Ambetter EOC register")
-    parser.add_argument("--output-dir", type=Path, default=DELIVERABLES_DIR)
+    parser.add_argument("--output-dir", type=Path, default=REPO_ROOT / "outputs" / "c2")
     args = parser.parse_args()
     if args.index:
         paths = args.index

@@ -34,7 +34,7 @@ Run from the repository root after downloading the files:
 
 ```powershell
 $env:PYTHONPATH = "new"
-python -m pipeline.c4_rate_extractor.rate_extractor --manifest outputs/pipeline-smoke/file_manifest.csv --rate-dir data/ratefiles --c3-details deliverables/file_quality_details.json --as-of 2026-10-18 --output-dir outputs/c4
+python -m pipeline.c4_rate_extractor.rate_extractor --manifest outputs/pipeline-smoke/file_manifest.csv --rate-dir data/ratefiles --c3-details audit/file_quality_details.json --as-of 2026-10-18 --output-dir outputs/c4
 ```
 
 Alternatively repeat `--file path/to/file.json.gz`. The Python port is `run_files([RateFileInput(path, source_url, file_classification, expected_sha256, c3_quality_status)], output_dir, as_of=date(...))`.

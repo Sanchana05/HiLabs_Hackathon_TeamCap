@@ -36,7 +36,7 @@ from pipeline.c7_cost_effectiveness.cost_effectiveness import CostEffectivenessE
 from pipeline.config import (
     BENCHMARK_CODES,
     DATA_DIR,
-    DELIVERABLES_DIR,
+    RUN_OUTPUT_DIR,
     DOCS_DIR,
     RATEFILES_DIR,
     RAW_INDEX_DIR,
@@ -82,7 +82,7 @@ def run_pipeline(
     """Executes the full end-to-end PTD curation pipeline."""
     start_time = datetime.now(timezone.utc)
     run_as_of = as_of or date.today()
-    out_dir = output_dir or DELIVERABLES_DIR
+    out_dir = output_dir or RUN_OUTPUT_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
 
     summary_metrics = {
@@ -430,7 +430,7 @@ if __name__ == "__main__":
     parser.add_argument("--roster-snapshot", type=date.fromisoformat, help="Roster snapshot date if CSV rows lack source_date")
     parser.add_argument("--ppo-directory-plan", action="append", help="Exact plan/network name in payer-directory evidence")
     parser.add_argument("--ppo-rate-attribution", action="append", help="Explicit C4 plan_attribution accepted for C6")
-    parser.add_argument("--output-dir", type=Path, default=DELIVERABLES_DIR, help="Deliverables output directory")
+    parser.add_argument("--output-dir", type=Path, default=RUN_OUTPUT_DIR, help="Full pipeline output directory")
     parser.add_argument("--all-codes", action="store_true", help="Legacy option; C4 always processes all codes")
     parser.add_argument("--as-of", type=date.fromisoformat, help="C3/C4 reference date (YYYY-MM-DD)")
     parser.add_argument("--c3-benchmark-csv", type=Path, help="C3 weighted expected billing-code panel")

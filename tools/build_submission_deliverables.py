@@ -49,8 +49,8 @@ def nested_section(path: Path) -> str:
 
 def build(source: Path, output: Path) -> None:
     output.mkdir(parents=True, exist_ok=True)
-    c2 = read_json(source / "deliverables" / "c2_summary.json")
-    c3_all = read_json(source / "deliverables" / "file_quality_details.json")
+    c2 = read_json(source / "audit" / "c2_summary.json")
+    c3_all = read_json(source / "audit" / "file_quality_details.json")
     manifest_path = source / "outputs" / "c4" / "c4_manifest.csv"
     c4_files = sorted((source / "outputs" / "c4").glob("*/c4_summary.json"))
     c4 = read_json(c4_files[0]) if len(c4_files) == 1 else None
@@ -93,7 +93,7 @@ def build(source: Path, output: Path) -> None:
 
     # Target counts come from the current manifest, not a historical report.
     import csv
-    with (source / "deliverables" / "file_manifest.csv").open(newline="", encoding="utf-8") as stream:
+    with (source / "audit" / "file_manifest.csv").open(newline="", encoding="utf-8") as stream:
         target_rows = list(csv.DictReader(stream))
     if len(target_rows) != 1:
         raise ValueError("Expected one current Health Net CA handoff file; review the manifest")
@@ -216,6 +216,6 @@ def build(source: Path, output: Path) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=PROJECT_ROOT)
-    parser.add_argument("--output-dir", type=Path, default=PROJECT_ROOT / "deliverables")
+    parser.add_argument("--output-dir", type=Path, default=PROJECT_ROOT / "outputs" / "submission-preview")
     args = parser.parse_args()
     build(args.source, args.output_dir)

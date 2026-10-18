@@ -19,6 +19,7 @@ st.set_page_config(
 UI_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = UI_DIR.parent
 DELIVERABLES_DIR = PROJECT_ROOT / "deliverables"
+AUDIT_DIR = PROJECT_ROOT / "audit"
 DOCS_DIR = PROJECT_ROOT / "docs"
 OUTPUTS_PPO_DIR = PROJECT_ROOT / "outputs" / "ppo"
 
@@ -45,7 +46,7 @@ view_mode = st.sidebar.radio(
 # Load data helper
 @st.cache_data
 def load_summary():
-    summary_path = DELIVERABLES_DIR / "Summary_Metrics.json"
+    summary_path = AUDIT_DIR / "Summary_Metrics.json"
     if summary_path.is_file():
         with open(summary_path, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -53,28 +54,28 @@ def load_summary():
 
 @st.cache_data
 def load_quality_details():
-    path = DELIVERABLES_DIR / "file_quality_details.json"
+    path = AUDIT_DIR / "file_quality_details.json"
     if path.is_file():
         return json.loads(path.read_text(encoding="utf-8"))
     return []
 
 @st.cache_data
 def load_rates():
-    csv_path = DELIVERABLES_DIR / "c6" / "c6_verified_rates.csv"
+    csv_path = AUDIT_DIR / "c6" / "c6_verified_rates.csv"
     if csv_path.is_file():
         return pd.read_csv(csv_path, dtype={"NPI": str, "TIN": str}, nrows=100_000)
     return pd.DataFrame()
 
 @st.cache_data
 def load_rate_candidates():
-    csv_path = DELIVERABLES_DIR / "c6" / "c6_supported_rate_candidates.csv"
+    csv_path = AUDIT_DIR / "c6" / "c6_supported_rate_candidates.csv"
     if csv_path.is_file():
         return pd.read_csv(csv_path, dtype={"NPI": str, "TIN": str, "Billing Code": str}, nrows=100_000)
     return pd.DataFrame()
 
 @st.cache_data
 def load_c5_summary():
-    for path in (DELIVERABLES_DIR / "c5" / "c5_summary.json",
+    for path in (AUDIT_DIR / "c5" / "c5_summary.json",
                  PROJECT_ROOT / "outputs" / "c5" / "c5_summary.json"):
         if path.is_file():
             return json.loads(path.read_text(encoding="utf-8"))
@@ -82,14 +83,14 @@ def load_c5_summary():
 
 @st.cache_data
 def load_decisions():
-    p = DELIVERABLES_DIR / "plan_decisions.csv"
+    p = AUDIT_DIR / "plan_decisions.csv"
     if p.is_file():
         return pd.read_csv(p)
     return pd.DataFrame()
 
 @st.cache_data
 def load_manifest():
-    p = DELIVERABLES_DIR / "file_manifest.csv"
+    p = AUDIT_DIR / "file_manifest.csv"
     if p.is_file():
         return pd.read_csv(p)
     return pd.DataFrame()
@@ -229,8 +230,8 @@ elif view_mode == "📈 C7 Cost-Effectiveness Benchmarking":
     **Specialty Price Index (SPI)**: Volume-weighted ratio of provider rates vs peer group market median ($SPI < 1.00$ indicates below-market / cost-effective pricing).
     """)
 
-    cost_path = DELIVERABLES_DIR / "provider_cost_effectiveness_benchmark.csv"
-    c6_summary_path = DELIVERABLES_DIR / "c6" / "c6_summary.json"
+    cost_path = AUDIT_DIR / "provider_cost_effectiveness_benchmark.csv"
+    c6_summary_path = AUDIT_DIR / "c6" / "c6_summary.json"
     c6_status = json.loads(c6_summary_path.read_text(encoding="utf-8")) if c6_summary_path.is_file() else {}
     if cost_path.is_file() and c6_status.get("counts", {}).get("exported_rate_rows", 0) > 0 and "C7" in summary_data.get("challenges_executed", []):
         cost_df = pd.read_csv(cost_path)
