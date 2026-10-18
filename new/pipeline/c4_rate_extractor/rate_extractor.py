@@ -32,7 +32,7 @@ class RateExtractor:
         max_records_per_code: Optional[int] = None
     ):
         # Default to all benchmark codes if not specified
-        self.target_codes = target_codes or set(BENCHMARK_CODES.keys())
+        self.target_codes = target_codes if target_codes is not None else set(BENCHMARK_CODES.keys())
         self.max_records_per_code = max_records_per_code
         self.extraction_stats = {
             "total_items_scanned": 0,

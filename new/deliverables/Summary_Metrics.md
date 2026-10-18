@@ -1,6 +1,8 @@
 # Executive Run Summary: Centene CA Commercial PPO Rate Curation
 **Pursuant to Centene California Commercial-Group PPO Classification Plan**
 
+**Status:** The C3 score below was independently rerun on the complete downloaded Centene MRF as of 2026-10-18. C4–C7 figures in this older summary came from synthetic demonstration rows and are not verified submission results. Use `file_quality_details.json` for C3 evidence.
+
 - **Execution Date**: 2026-10-17 17:38:31 UTC
 - **Target Snapshot Date**: 2026-09-30
 - **Target Payer**: Centene Corporation (Health Net Life Insurance Company)
@@ -26,7 +28,7 @@
 | **C2: Rate File Attribution** | Distinct Rate Files Referenced | 1 | `healthnet-ca_in-network.json` |
 | | **Rate File Classification** | **MIXED** | Linked by both HMO and PPO plans; cannot assume PPO exclusivity |
 | | **Plan Attribution Limitation** | **SHARED_FILE_UNRESOLVED** | Rate records preserved without false plan-level multiplication |
-| **C3: File Quality** | **Composite File Quality Score (FQS)** | **70.72 / 100 (Grade B)** | 7-Metric Quality Engine (Code cov, provider cov, zero-rate, etc.) |
+| **C3: File Quality** | **Complete-file composite** | **83.33 / 100 (Grade B; review required)** | 1,500,288 published prices audited; see scorecard and detailed review flags |
 | **C4: Rates Curation** | Raw Rates Extracted | 8 | Streamed from shared in-network file |
 | | Curated Conflict-Resolved Rates | 7 | 4-Tier Protocol (Prof > POS 11 Office > Freshness > Median) |
 | **C5: Address Resolution** | Unique In-Network NPIs | 5 | Type 1 Individuals & Type 2 Organizations |

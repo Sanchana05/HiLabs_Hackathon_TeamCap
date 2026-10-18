@@ -59,7 +59,8 @@ new/
 │   ├── Centene_CA_Commercial_PPO_Provider_Rates.xlsx   # Deliverable 1
 │   ├── Logic_File.md                                   # Deliverable 2
 │   ├── File_Quality_Metrics.md                         # Deliverable 3
-│   ├── file_quality_scorecard.csv                      # Deliverable 3 (Scorecard)
+  │   ├── file_quality_scorecard.csv                      # Deliverable 3 (Scorecard)
+  │   ├── file_quality_details.json                       # Complete-file counts and review flags
 │   ├── Summary_Metrics.json                            # Deliverable 4
 │   ├── Summary_Metrics.md                              # Deliverable 4 (Report)
 │   └── provider_cost_effectiveness_benchmark.csv       # Deliverable 7 (C7 Bonus)
@@ -87,18 +88,12 @@ new/
   3. **POS Exclusion**: Two-tiered gatekeeper models requiring Primary Care Physician (PCP) referrals.
   4. **PPO Identification**: Isolates open-access PPO health insurance underwritten by **Health Net Life Insurance Company** (regulated by the California Department of Insurance - CDI), mapping to the state commercial in-network rate file (`...healthnet-ca_in-network.json`).
 
-### Challenge C3: File Quality & Completeness Grading (35 Points)
+### Challenge C3: Complete-file quality audit
 - **Module**: `pipeline/c3_file_grader/file_grader.py`
-- **Documentation**: [`docs/C3_FILE_QUALITY_METRICS.md`](docs/C3_FILE_QUALITY_METRICS.md)
-- Computes the **Composite File Quality Score (FQS)** from 0 to 100:
-  $$\text{FQS} = 0.20 S_{\text{code}} + 0.20 S_{\text{prov}} + 0.20 S_{\text{zero}} + 0.15 S_{\text{type}} + 0.10 S_{\text{outlier}} + 0.10 S_{\text{fresh}} + 0.05 S_{\text{dup}}$$
-  - **$S_{\text{code}}$ (20%)**: Volume-weighted coverage of high-impact E/M and benchmark codes.
-  - **$S_{\text{prov}}$ (20%)**: California NPI/TIN network breadth.
-  - **$S_{\text{zero}}$ (20%)**: Steep penalty for $0.00, negative, and placeholder rates.
-  - **$S_{\text{type}}$ (15%)**: Proportion of clean fee-for-service allowed amounts.
-  - **$S_{\text{outlier}}$ (10%)**: Rates bounded within statistical IQR.
-  - **$S_{\text{fresh}}$ (10%)**: Compliance with 30-day TiC refresh requirements.
-  - **$S_{\text{dup}}$ (5%)**: Deduplication integrity against duplicate rows.
+- **Methods and limits**: [`docs/C3_FILE_QUALITY_METRICS.md`](docs/C3_FILE_QUALITY_METRICS.md)
+- Audits every published price in each C2-selected MRF before C4 filters or selects rates. The scorecard includes raw counts, SHA-256, data-source dates, provider-reference integrity, code-panel coverage, price usability, rate-type mix, comparable-rate outliers, publication freshness, and exact provider-price duplicates.
+- The 579-code individual-specialty panel is built from the supplied case workbook; a verified PPO NPI roster can be supplied for external coverage. Without a roster, provider coverage is reported as unknown, while provider **linkage** is scored.
+- Missing evidence never receives default points. A malformed or missing file fails the run.
 
 ### Challenge C4: Streaming Rate Extraction & Multi-Rate Conflict Resolution
 - **Module**: `pipeline/c4_rate_extractor/rate_extractor.py`
@@ -163,6 +158,15 @@ python new/pipeline/run_pipeline.py --all-codes
 
 All deliverables are automatically written to `new/deliverables/`.
 
+To run only C3 on the reviewed C2 manifest and local files:
+
+```bash
+cd new
+python -m pipeline.c3_file_grader.file_grader --manifest deliverables/file_manifest.csv --rate-dir ../data/ratefiles --output-dir ../outputs/c3 --as-of 2026-10-18
+```
+
+Repeat `--file PATH` instead of `--manifest` to grade explicit files. The master runner uses the same C3 API for every PPO-linked file; `--as-of`, `--c3-benchmark-csv`, and `--c3-expected-npis-csv` control its C3 inputs. The original branch's C4–C7 demonstration outputs include synthetic provider/address rows and are **not verified production results**.
+
 ---
 
 ## 5. Launching the Interactive UI (Deliverable 7 Brownie Points)
@@ -186,6 +190,6 @@ The portal provides:
 | :--- | :--- | :--- |
 | **Deliverable 1** | `new/deliverables/Centene_CA_Commercial_PPO_Provider_Rates.xlsx` | Curated provider rate file [NPI, TIN, Address, Billing Code, Specialty, Rate] |
 | **Deliverable 2** | `new/deliverables/Logic_File.md` | Logic for PPO network identification and TIN/NPI/Address mapping |
-| **Deliverable 3** | `new/deliverables/File_Quality_Metrics.md` & `file_quality_scorecard.csv` | 7-metric PTD file grading rubric and file scorecards |
+| **Deliverable 3** | `new/deliverables/File_Quality_Metrics.md`, `file_quality_scorecard.csv`, `file_quality_details.json` | Complete-file methodology, scorecard, raw counts, and review flags |
 | **Deliverable 4** | `new/deliverables/Summary_Metrics.md` & `Summary_Metrics.json` | High-level execution metrics and run statistics |
 | **Deliverable 7** | `new/deliverables/provider_cost_effectiveness_benchmark.csv` & `new/ui/app.py` | C7 Cost-effectiveness metrics & Interactive Streamlit Dashboard |
