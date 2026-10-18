@@ -65,7 +65,7 @@ new/
   │   ├── file_quality_details.json                       # Complete-file counts and review flags
 │   ├── Summary_Metrics.json                            # Deliverable 4
 │   ├── Summary_Metrics.md                              # Deliverable 4 (Report)
-│   └── provider_cost_effectiveness_benchmark.csv       # Deliverable 7 (C7 Bonus)
+│   └── provider_cost_effectiveness_benchmark.csv       # C7 output only after verified C6 rows exist
 └── README.md                         # This file
 ```
 
@@ -267,6 +267,8 @@ The portal provides:
 | **Deliverable 3** | `new/deliverables/File_Quality_Metrics.md`, `file_quality_scorecard.csv`, `file_quality_details.json` | Complete-file methodology, scorecard, raw counts, and review flags |
 | **Deliverable 4** | `new/deliverables/Summary_Metrics.md` & `Summary_Metrics.json` | High-level execution metrics and run statistics |
 | **C5 audit** | `new/deliverables/c5/c5_provider_locations.csv`, `c5_evidence.csv`, `c5_review_queue.csv`, `c5_summary.json` | Candidate and corroborated sites, evidence, and unresolved cases |
-| **Deliverable 7** | `new/deliverables/provider_cost_effectiveness_benchmark.csv` & `new/ui/app.py` | C7 Cost-effectiveness metrics & Interactive Streamlit Dashboard |
+| **Deliverable 7 (conditional)** | `new/deliverables/provider_cost_effectiveness_benchmark.csv` & `new/ui/app.py` | C7 cost-effectiveness output is generated only when verified C6 rows exist; the UI can show current evidence and candidate review |
 
 The master runner refreshes the logic, file-quality, and summary documents. A submission video requires separate recording. The scorecard must keep candidate-address reach, verified linkage, and final verified-rate yield distinct.
+
+See [deliverables/README.md](deliverables/README.md) for the submission file index and status. Older synthetic demonstrations are not included in that index. The C5/C6 SQLite work databases and C4 scratch files are generated locally and excluded from Git.
