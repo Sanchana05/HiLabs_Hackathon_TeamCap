@@ -1,0 +1,54 @@
+{
+  "execution_start_utc": "2026-10-17T17:38:31.539189+00:00",
+  "challenges_executed": [
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "C6",
+    "C7"
+  ],
+  "index_files_parsed_count": 11,
+  "raw_plan_records_count": 3275,
+  "deduplicated_plans_count": 3270,
+  "ppo_plans_identified_count": 452,
+  "ppo_rate_files_identified_count": 1,
+  "file_quality_scores": {
+    "https://www.centene.com/content/dam/centene/Centene%20Corporate/json/DOCUMENT/2026-09-30_centene-management-company-llc_healthnet-ca_in-network.json": {
+      "composite_fqs": 83.33,
+      "grade": "B",
+      "quality_status": "REVIEW_REQUIRED",
+      "as_of": "2026-10-18",
+      "sha256": "3b3e4e220f421010b8ef925a51d4a3c17863b9fbaa853841c1a4927eb74a0960"
+    }
+  },
+  "raw_rates_extracted_count": 8,
+  "curated_rates_count": 7,
+  "unique_npis_count": 5,
+  "unique_tins_count": 4,
+  "unique_addresses_count": 4,
+  "share_npis_verified_address": 100.0,
+  "deliverables_generated": [
+    "centene_c1_deduplicated_plans.csv",
+    "plan_decisions.csv",
+    "file_manifest.csv",
+    "review_queue.csv",
+    "centene_c2_ppo_network_plans.csv",
+    "centene_c2_ppo_rate_files.csv",
+    "file_quality_scorecard.csv",
+    "Centene_CA_Commercial_PPO_Provider_Rates.xlsx",
+    "provider_cost_effectiveness_benchmark.csv"
+  ],
+  "confirmed_ppo_count": 30,
+  "provisional_ppo_count": 422,
+  "excluded_non_ppo_count": 2810,
+  "unresolved_count": 8,
+  "eoa_overlap_count": 127,
+  "collapsed_token_count": 1,
+  "retiree_review_count": 1,
+  "execution_end_utc": "2026-10-17T17:38:42.600307+00:00",
+  "duration_seconds": 11.06,
+  "c3_audit_status": "REAL_COMPLETE_FILE",
+  "other_challenges_status": "EARLIER_SYNTHETIC_DEMONSTRATION_NOT_VERIFIED"
+}

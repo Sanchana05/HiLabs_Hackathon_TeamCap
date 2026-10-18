@@ -1,0 +1,14 @@
+{
+  "total_plans_audited": 3270,
+  "confirmed_ppo_count": 30,
+  "provisional_ppo_count": 422,
+  "excluded_non_ppo_count": 2810,
+  "unresolved_count": 8,
+  "unique_rate_files_count": 33,
+  "mixed_rate_files_count": 1,
+  "ppo_only_rate_files_count": 0,
+  "eoa_overlap_sensitivity_count": 127,
+  "collapsed_token_count": 1,
+  "retiree_review_count": 1,
+  "rule_version": "2026.09-v2.0"
+}
