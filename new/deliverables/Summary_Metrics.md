@@ -20,7 +20,7 @@
 | **C2: Network Decisions** | **Confirmed CA Commercial PPO Plans** | **30** | Exact 2026 Small Group Full Network PPO EOC match |
 | | **Provisional CA Commercial PPO Plans** | **422** | Custom employer group PPO schedules + HDHP 1800 variants |
 | | **Total CA Commercial PPO Universe** | **452** | Combined Confirmed + Provisional PPO candidate scope |
-| | Historical non-PPO or out-of-scope rows | 2810 | Current C2 separates 852 explicit non-PPO labels and 1958 out-of-scope edges |
+| | Historical non-PPO or out-of-scope rows | 2810 | This historical run used the former California group C2 scope; see `c2_summary.json` for current all-brand decisions |
 | | Ruled Out POS Plans | 6 | Excluded: Two-tiered gatekeeper requiring PCP referral |
 | | EOA Overlap Sensitivity Cohort | 127 | Exclusive Option Advantage (HMO with PPO tier; flagged for sensitivity) |
 | | Collapsed Token Anomaly (CUSPPO) | 1 | Recovered via regex punctuation tokenization (`CA L CUSPPO`) |

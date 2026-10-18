@@ -136,6 +136,9 @@ def run_pipeline(
     summary_metrics["out_of_scope_count"] = int((classified_df["product_status"] == "OUT_OF_SCOPE").sum())
     summary_metrics["unresolved_count"] = int((classified_df["product_status"] == "UNRESOLVED").sum())
     summary_metrics["ppo_rate_files_identified_count"] = len(ppo_files_df)
+    target_decisions = classified_df[classified_df["downstream_target"]]
+    summary_metrics["target_confirmed_ppo_count"] = int(target_decisions["product_status"].eq("CONFIRMED_PPO").sum())
+    summary_metrics["target_provisional_ppo_count"] = int(target_decisions["product_status"].eq("PROVISIONAL_PPO").sum())
     summary_metrics["eoa_overlap_count"] = int(classified_df["anomaly_tags"].str.contains("EOA_OVERLAP_SENSITIVITY").sum())
     summary_metrics["collapsed_token_count"] = int(classified_df["anomaly_tags"].str.contains("COLLAPSED_TOKEN_CUSPPO").sum())
     summary_metrics["retiree_review_count"] = int(classified_df["anomaly_tags"].str.contains("RETIREE_OR_PUBLIC_WORD").sum())
@@ -359,7 +362,7 @@ def run_pipeline(
     summary_md_content = f"""# Executive Run Summary: Centene CA Commercial PPO Rate Curation
 **Pursuant to Centene California Commercial-Group PPO Classification Plan**
 
-**Validation scope:** C2 confirms 2026 Health Net PPO product types only for exact official EOC matches. Custom PPO plans remain provisional; provider membership is unverified. C3 and C4 audit complete source MRFs. C4 output is in `c4/c4_manifest.csv` and per-file audit CSVs. C5 uses synthetic address seed rows and at most 10,000 C4-selected rows; C5–C7 figures below are demonstration results, not verified submission metrics.
+**Validation scope:** C2 classifies all four indexed brands using official 2026 EOCs, CMS plan attributes, carrier family evidence, and review rules. C3/C4 consume only the Health Net California group handoff. Provider membership is unverified. C3 and C4 audit complete source MRFs. C4 output is in `c4/c4_manifest.csv` and per-file audit CSVs. C5 uses synthetic address seed rows and at most 10,000 C4-selected rows; C5–C7 figures below are demonstration results, not verified submission metrics.
 
 - **Execution Date**: {start_time.strftime('%Y-%m-%d %H:%M:%S UTC')}
 - **Target Snapshot Date**: {TARGET_SNAPSHOT_DATE}
@@ -374,11 +377,12 @@ def run_pipeline(
 | **C1: Index Inventory** | Index Files Successfully Parsed | {summary_metrics['index_files_parsed_count']} | All Centene brand indexes (Health Net, Ambetter, Fidelis, QualChoice) |
 | | Raw Plan Records Discovered | {summary_metrics['raw_plan_records_count']} | Full reporting structure edges |
 | | Unique Plan-File Edges | {summary_metrics['deduplicated_plans_count']} | Deduplicated on brand/name/id/id-type/market/url |
-| **C2: Network Decisions** | **Confirmed CA Commercial PPO Plans** | **{summary_metrics.get('confirmed_ppo_count', 0)}** | Exact 2026 Small Group Full Network PPO EOC match |
-| | **Provisional CA Commercial PPO Plans** | **{summary_metrics.get('provisional_ppo_count', 0)}** | Custom employer group PPO schedules + HDHP 1800 variants |
+| **C2: Network Decisions** | **Confirmed PPO plan-file edges across all brands** | **{summary_metrics.get('confirmed_ppo_count', 0)}** | Exact 2026 EOC or CMS plan-attribute match |
+| | **Provisional PPO plan-file edges across all brands** | **{summary_metrics.get('provisional_ppo_count', 0)}** | Explicit PPO token without an exact matching authority |
+| | **Health Net CA group PPO handoff edges** | **{summary_metrics['target_confirmed_ppo_count']} confirmed; {summary_metrics['target_provisional_ppo_count']} provisional** | Only these PPO-linked files enter C3/C4 |
 | | **PPO-Labeled Candidate Edges** | **{summary_metrics['ppo_plans_identified_count']}** | Confirmed + provisional; not a unique-product count |
 | | Explicit Non-PPO Labels | {summary_metrics.get('excluded_non_ppo_count', 0)} | HMO, EPO, POS, or EOA token; no inferred contract model |
-| | Out-of-Scope Edges | {summary_metrics.get('out_of_scope_count', 0)} | Other geography, market, or index date |
+| | Out-of-Scope Edges | {summary_metrics.get('out_of_scope_count', 0)} | Invalid provenance or index date; geography and market are classified in C2 |
 | | EOA Overlap Sensitivity Cohort | {summary_metrics.get('eoa_overlap_count', 127)} | Exclusive Option Advantage (HMO with PPO tier; flagged for sensitivity) |
 | | Collapsed Token Anomaly (CUSPPO) | {summary_metrics.get('collapsed_token_count', 1)} | Recovered via regex punctuation tokenization (`CA L CUSPPO`) |
 | | Retiree / Government Review Queue | {summary_metrics.get('retiree_review_count', 1)} | Flagged for active commercial group employment eligibility audit |

@@ -1,6 +1,6 @@
 """Configuration module for Centene TiC Price Transparency Data (PTD) Pipeline.
 Ensures zero hardcoded paths, enables local-first data discovery, and centralizes all business rules.
-Adheres strictly to the Centene California Commercial Group PPO Classification Plan.
+C2 classifies every supplied brand; C3/C4 target Health Net California group.
 """
 from pathlib import Path
 import os
@@ -58,7 +58,7 @@ HTTP_HEADERS = {
 }
 HTTP_TIMEOUT = (15, 120)  # (connect timeout, read timeout in seconds)
 
-# Scope Definition (Hackathon Section 3)
+# C3/C4 handoff target (Hackathon Section 3)
 TARGET_STATE = "CA"
 TARGET_MARKET = "group"       # Commercial Group
 TARGET_NETWORK = "PPO"        # Preferred Provider Organization
@@ -71,18 +71,18 @@ CENTENE_BRANDS = {
         "primary_entity": "Healthnet, LLC (index issuer label; underwriting entity not inferred)"
     },
     "ambetter": {
-        "description": "Ambetter (Individual ACA Marketplace on Covered CA)",
-        "has_ca_commercial_ppo": False,  # Evaluated and confirmed out-of-scope for Commercial Group PPO
+        "description": "Ambetter individual plans across supplied states and exchange/off-exchange markets",
+        "has_ca_commercial_ppo": False,  # False for the California group handoff only
         "primary_entity": "Ambetter from Health Net"
     },
     "fidelis": {
-        "description": "Fidelis Care (New York State Medicaid/Medicare/Exchange)",
-        "has_ca_commercial_ppo": False,  # NY only
+        "description": "Fidelis Care New York Essential Plans in the supplied index",
+        "has_ca_commercial_ppo": False,
         "primary_entity": "New York Catholic Health Plan, Inc."
     },
     "qualchoice": {
-        "description": "QualChoice Health Insurance (Arkansas market)",
-        "has_ca_commercial_ppo": False,  # AR only
+        "description": "QualChoice group plans in the supplied index",
+        "has_ca_commercial_ppo": False,
         "primary_entity": "QCA Health Plan / QualChoice Life & Health"
     }
 }

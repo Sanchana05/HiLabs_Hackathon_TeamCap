@@ -13,7 +13,8 @@ from pipeline.c2_network_mapper.verify_ppo_network import PPOVerificationEngine
 from pipeline.config import DELIVERABLES_DIR, RAW_INDEX_DIR, REPO_ROOT
 
 
-def run(index_paths: list[Path], output_dir: Path, evidence_path: Path | None = None) -> dict:
+def run(index_paths: list[Path], output_dir: Path, evidence_path: Path | None = None,
+        cms_reference_path: Path | None = None, ambetter_eoc_path: Path | None = None) -> dict:
     paths = sorted({Path(path).resolve() for path in index_paths})
     if not paths:
         raise ValueError("No index files supplied; use --index-dir or --index")
@@ -36,7 +37,7 @@ def run(index_paths: list[Path], output_dir: Path, evidence_path: Path | None = 
         })
         first_source_by_hash.setdefault(digest, path.name)
     plans = parser.build_deduplicated_plan_table()
-    engine = PPOVerificationEngine(evidence_path)
+    engine = PPOVerificationEngine(evidence_path, cms_reference_path, ambetter_eoc_path)
     decisions, all_files, review, summary = engine.verify_all_plans(plans)
     selected_files = engine.select_ppo_files(all_files)
     if selected_files.empty:
@@ -71,7 +72,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Repeatable C1/C2 run from local CMS TiC index files")
     parser.add_argument("--index-dir", type=Path, help="Folder of *_index.json files")
     parser.add_argument("--index", type=Path, action="append", help="Explicit index file; repeatable")
-    parser.add_argument("--evidence", type=Path, help="Versioned 2026 official EOC register")
+    parser.add_argument("--evidence", type=Path, help="Versioned 2026 Health Net EOC register")
+    parser.add_argument("--cms-reference", type=Path, help="Versioned 2026 CMS Plan Attributes PUF extract")
+    parser.add_argument("--ambetter-eocs", type=Path, help="Versioned 2026 California Ambetter EOC register")
     parser.add_argument("--output-dir", type=Path, default=DELIVERABLES_DIR)
     args = parser.parse_args()
     if args.index:
@@ -81,7 +84,8 @@ def main() -> None:
         if not index_dir.is_dir() and not args.index_dir:
             index_dir = RAW_INDEX_DIR
         paths = list(index_dir.glob("*_index.json"))
-    print(json.dumps(run(paths, args.output_dir, args.evidence), indent=2, sort_keys=True))
+    print(json.dumps(run(paths, args.output_dir, args.evidence, args.cms_reference, args.ambetter_eocs),
+                     indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

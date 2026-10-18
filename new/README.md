@@ -12,7 +12,7 @@ However, extracting reliable intelligence from raw PTD is notoriously difficult:
 2. **Data Quality Deficits**: Published rate files are plagued by $0.00 rates, placeholder rates ($0.01, $99,999), Cartesian duplicates, missing core E/M codes, and contract staleness.
 3. **Provider Context**: Raw rate files link rates to an NPI and Tax ID (TIN) without practice addresses or specialties. NPPES address and taxonomy records require independent verification before they can support a provider-level deliverable.
 
-Current status: C1/C2 runs repeatably from the supplied indexes with official 2026 EOC evidence and a conservative review queue. C3 grades complete source files and C4 audits and selects published rate contexts. The shared rate file does not establish PPO provider membership. C5–C7 currently produce demonstration outputs using synthetic address seeds.
+Current status: C1/C2 runs repeatably across all four indexed brands with official 2026 EOC and CMS plan-attribute evidence and a conservative review queue. The C3/C4 handoff remains the Health Net California group file. C3 grades complete source files and C4 audits and selects published rate contexts. The shared rate file does not establish PPO provider membership. C5–C7 currently produce demonstration outputs using synthetic address seeds.
 
 ---
 
@@ -82,11 +82,11 @@ new/
 ### Challenge C2: Isolate PPO Network & Rule Out HMO, EPO, and POS
 - **Module**: `pipeline/c2_network_mapper/network_classifier.py`
 - **Documentation**: [`docs/C1_C2_METHODOLOGY_AND_LOGIC.md`](docs/C1_C2_METHODOLOGY_AND_LOGIC.md)
-- Implements statutory and regulatory insurance principles in California:
-  1. **Scope**: Requires a California group file URL and an index date no later than the September 2026 cutoff.
-  2. **Evidence**: Confirms PPO product type and Full Network PPO name only on exact 2026 Health Net EOC matches. The published index EIN is sponsor-level, not a product key.
-  3. **Review**: Keeps custom PPO plans provisional, conflicting/retiree names unresolved, and explicit HMO/EPO/POS/EOA names out of the pure PPO set.
-  4. **Handoff**: Emits a PPO-linked file manifest for C3/C4 and marks shared files `MIXED`; file linkage does not establish provider-level PPO membership.
+- Classifies Health Net, Ambetter, Fidelis, and QualChoice plan-file edges across their indexed states and markets:
+  1. **Scope**: Requires a recognized brand, source index, consistent state clues, and an index date no later than the September 2026 cutoff.
+  2. **Evidence**: Uses exact 2026 Health Net and California Ambetter EOC titles; matches Ambetter plans to the CMS 2026 Plan Attributes PUF by state, market, HIOS product ID, and exact marketing name. Fidelis Essential Plan carrier evidence excludes that non-PPO family. QualChoice PPO family evidence supports provisional, not plan-specific, classification.
+  3. **Review**: Keeps other PPO names provisional, conflicting or unlabeled names unresolved, and explicit HMO/EPO/POS/EOA names out of the pure PPO set.
+  4. **Handoff**: Emits only the Health Net California group PPO-linked file manifest for C3/C4 and marks shared files `MIXED`; file linkage does not establish provider-level PPO membership.
 
 Run C1/C2 independently, without C3/C4 inputs:
 

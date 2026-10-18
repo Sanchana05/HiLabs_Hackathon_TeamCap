@@ -35,8 +35,12 @@ logger = logging.getLogger(__name__)
 class NetworkClassifier:
     """Classifies health plans into product and network types pursuant to the classification plan."""
 
-    def __init__(self, evidence_csv_path: Optional[Path] = None):
-        self.engine = PPOVerificationEngine(evidence_csv_path=evidence_csv_path)
+    def __init__(self, evidence_csv_path: Optional[Path] = None,
+                 cms_reference_path: Optional[Path] = None,
+                 ambetter_eoc_path: Optional[Path] = None):
+        self.engine = PPOVerificationEngine(evidence_csv_path=evidence_csv_path,
+                                            cms_reference_path=cms_reference_path,
+                                            ambetter_eoc_path=ambetter_eoc_path)
         self.classification_stats = {
             STATUS_CONFIRMED_PPO: 0,
             STATUS_PROVISIONAL_PPO: 0,
