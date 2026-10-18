@@ -27,7 +27,7 @@ if str(NEW_DIR) not in sys.path:
 from pipeline.c1_index_parser.index_parser import CenteneIndexParser
 from pipeline.c2_network_mapper.network_classifier import NetworkClassifier
 from pipeline.c3_file_grader.file_grader import FileQualityGrader, write_reports
-from pipeline.c4_rate_extractor.rate_extractor import RateExtractor
+from pipeline.c4_rate_extractor.rate_extractor import RateFileInput, run_files
 from pipeline.c5_address_mapper.address_normalizer import AddressNormalizer
 from pipeline.c5_address_mapper.nppes_taxonomy_resolver import NPPESTaxonomyResolver
 from pipeline.c5_address_mapper.tin_address_clusterer import TINAddressClusterer
@@ -67,6 +67,7 @@ def run_pipeline(
 ) -> Dict:
     """Executes the full end-to-end PTD curation pipeline."""
     start_time = datetime.now(timezone.utc)
+    run_as_of = as_of or date.today()
     out_dir = output_dir or DELIVERABLES_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -85,7 +86,7 @@ def run_pipeline(
         "unique_tins_count": 0,
         "unique_addresses_count": 0,
         "share_npis_verified_address": 0.0,
-        "downstream_validation_status": "C4 is limited to a benchmark-code sample; C5 currently uses synthetic address seed rows. C6 and C7 are demonstration outputs.",
+        "downstream_validation_status": "C4 audits full selected files; C5 currently uses synthetic address seed rows. C5-C7 are demonstration outputs.",
         "deliverables_generated": []
     }
 
@@ -120,9 +121,6 @@ def run_pipeline(
     c1_dedup_df.to_csv(c1_dedup_path, index=False)
     summary_metrics["deliverables_generated"].append(str(c1_dedup_path.name))
 
-    # =========================================================================
-    # CHALLENGE C2: Find PPO Network (Rule out HMO, EPO, POS)
-    # =========================================================================
     # =========================================================================
     # CHALLENGE C2: Find PPO Network (Rule out HMO, EPO, POS)
     # =========================================================================
@@ -194,7 +192,7 @@ def run_pipeline(
     index_date = max((str(i.get("last_updated_on", "")) for i in parser.index_inventories), default="")
     quality_results = [
         grader.grade_file(path, source_url=str(row["rate_file_url"]),
-                          index_last_updated=index_date, as_of=as_of,
+                          index_last_updated=index_date, as_of=run_as_of,
                           file_classification=str(row["file_classification"]), scratch_dir=out_dir)
         for path, row in selected_files
     ]
@@ -207,21 +205,27 @@ def run_pipeline(
     summary_metrics["deliverables_generated"].extend(
         ["file_quality_scorecard.csv", "file_quality_details.json"])
 
-    # Existing C4 remains a separate, bounded extraction stage.
-    logger.info(">>> STEP 4: Extracting rates (Challenge C4)...")
-    target_rate_file = selected_files[0][0]
-    target_codes = set(BENCHMARK_CODES.keys()) if limit_codes else set()
-    extractor = RateExtractor(target_codes=target_codes)
-    provider_refs = extractor.load_provider_references(target_rate_file)
-    raw_rates_list = []
-    for record in extractor.stream_raw_rates(target_rate_file, provider_refs):
-        raw_rates_list.append(record)
-        if len(raw_rates_list) >= 100_000:
-            break
-    raw_rates_df = pd.DataFrame(raw_rates_list)
-    summary_metrics["raw_rates_extracted_count"] = len(raw_rates_df)
-    curated_rates_df, conflict_stats = extractor.resolve_multi_rate_conflicts(raw_rates_df)
-    summary_metrics["curated_rates_count"] = len(curated_rates_df)
+    logger.info(">>> STEP 4: Validating and selecting rates from complete files (Challenge C4)...")
+    quality_by_url = {result["source_url"]: result for result in quality_results}
+    c4_inputs = [RateFileInput(
+        path=path, source_url=str(row["rate_file_url"]),
+        file_classification=str(row["file_classification"]),
+        expected_sha256=quality_by_url[str(row["rate_file_url"])]["sha256"],
+        c3_quality_status=quality_by_url[str(row["rate_file_url"])]["quality_status"],
+    ) for path, row in selected_files]
+    c4_results = run_files(c4_inputs, out_dir / "c4", as_of=run_as_of)
+    summary_metrics["c4_file_summaries"] = c4_results
+    summary_metrics["raw_rates_extracted_count"] = sum(r["counts"].get("expanded_rate_rows", 0) for r in c4_results)
+    summary_metrics["curated_rates_count"] = sum(r["counts"].get("selected", 0) for r in c4_results)
+    summary_metrics["deliverables_generated"].append("c4/c4_manifest.csv")
+
+    # Legacy C5-C7 operate on a bounded demonstration sample only. C4 files above
+    # remain complete and independent of this sample.
+    demo_path = out_dir / "c4" / c4_results[0]["source_file_id"] / "selected_rates.csv"
+    curated_rates_df = pd.read_csv(demo_path, dtype={"npi": str, "tin": str}, nrows=10_000)
+    curated_rates_df["service_codes"] = curated_rates_df["service_code"].fillna("")
+    curated_rates_df["selection_rationale"] = curated_rates_df["decision_reason"]
+    summary_metrics["downstream_demo_rows_count"] = len(curated_rates_df)
 
     # =========================================================================
     # CHALLENGE C5: Address & Specialty Mapping (TIN Consensus + NUCC)
@@ -346,14 +350,15 @@ def run_pipeline(
     summary_metrics["duration_seconds"] = round((end_time - start_time).total_seconds(), 2)
 
     summary_json_path = out_dir / "Summary_Metrics.json"
-    with open(summary_json_path, "w", encoding="utf-8") as f:
-        json.dump(summary_metrics, f, indent=2)
     summary_metrics["deliverables_generated"].append(summary_json_path.name)
+
+    c4_classifications = ", ".join(sorted({r["file_classification"] for r in c4_results}))
+    c4_attributions = ", ".join(sorted({r["plan_attribution"] for r in c4_results}))
 
     summary_md_content = f"""# Executive Run Summary: Centene CA Commercial PPO Rate Curation
 **Pursuant to Centene California Commercial-Group PPO Classification Plan**
 
-**Validation scope:** C3 scores are from complete source MRFs. C4 currently selects a benchmark-code sample, and C5 uses synthetic address seed rows. C4–C7 figures below are demonstration results, not verified submission metrics.
+**Validation scope:** C3 and C4 audit complete source MRFs. C1/C2 network classification remains under review, and C4 does not assert PPO provider membership. C4 output is in `c4/c4_manifest.csv` and per-file audit CSVs. C5 uses synthetic address seed rows and at most 10,000 C4-selected rows; C5–C7 figures below are demonstration results, not verified submission metrics.
 
 - **Execution Date**: {start_time.strftime('%Y-%m-%d %H:%M:%S UTC')}
 - **Target Snapshot Date**: {TARGET_SNAPSHOT_DATE}
@@ -377,12 +382,12 @@ def run_pipeline(
 | | Collapsed Token Anomaly (CUSPPO) | {summary_metrics.get('collapsed_token_count', 1)} | Recovered via regex punctuation tokenization (`CA L CUSPPO`) |
 | | Retiree / Government Review Queue | {summary_metrics.get('retiree_review_count', 1)} | Flagged for active commercial group employment eligibility audit |
 | | Unresolved Plans in Review Queue | {summary_metrics.get('unresolved_count', 0)} | Zero silent defaults; published in `review_queue.csv` |
-| **C2: Rate File Attribution** | Distinct Rate Files Referenced | {summary_metrics['ppo_rate_files_identified_count']} | `healthnet-ca_in-network.json` |
-| | **Rate File Classification** | **MIXED** | Linked by both HMO and PPO plans; cannot assume PPO exclusivity |
-| | **Plan Attribution Limitation** | **SHARED_FILE_UNRESOLVED** | Rate records preserved without false plan-level multiplication |
+| **C2: Rate File Attribution** | Distinct Rate Files Referenced | {summary_metrics['ppo_rate_files_identified_count']} | See `file_manifest.csv` |
+| | **Rate File Classification** | **{c4_classifications}** | From the C2 file manifest; not provider-level membership proof |
+| | **Plan Attribution Limitation** | **{c4_attributions}** | Source-file rows retain their attribution status |
 | **C3: File Quality** | **Complete-file grades** | **{', '.join(f"{r['file_name']}: {r['composite_fqs'] if r['composite_fqs'] is not None else 'not graded'} ({r['grade']})" for r in quality_results)}** | See per-file counts and limitations in file_quality_details.json |
-| **C4: Rates Curation** | Raw Rates Extracted | {summary_metrics['raw_rates_extracted_count']:,} | Streamed from shared in-network file |
-| | Curated Conflict-Resolved Rates | {summary_metrics['curated_rates_count']:,} | 4-Tier Protocol (Prof > POS 11 Office > Freshness > Median) |
+| **C4: Rates Curation** | Expanded Rate Rows Audited | {summary_metrics['raw_rates_extracted_count']:,} | Complete selected MRFs; all decisions in `c4/` |
+| | Selected Direct Professional FFS Rates | {summary_metrics['curated_rates_count']:,} | Actual lower-median published rate per exact service context; alternatives preserved |
 | **C5: Address Resolution** | Unique In-Network NPIs | {summary_metrics['unique_npis_count']:,} | Type 1 Individuals & Type 2 Organizations |
 | | Unique Contracted TINs | {summary_metrics['unique_tins_count']:,} | Medical groups and health systems |
 | | Unique Verified Practice Sites | {summary_metrics['unique_addresses_count']:,} | Physical addresses (PO Boxes strictly rejected) |
@@ -398,6 +403,7 @@ def run_pipeline(
 6. `file_manifest.csv` (C2 Rate File Manifest with MIXED classification)
 7. `review_queue.csv` (C2 Unresolved Review Queue)
 8. `provider_cost_effectiveness_benchmark.csv` (Deliverable 7: C7 Cost Effectiveness)
+9. `c4/c4_manifest.csv` and per-file C4 audit CSVs (complete source-file rate extraction)
 """
     summary_md_path = out_dir / "Summary_Metrics.md"
     summary_md_path.write_text(summary_md_content, encoding="utf-8")
@@ -406,6 +412,7 @@ def run_pipeline(
     # Synthesize Master Deliverable 2: Logic File
     logic_file_path = out_dir / "Logic_File.md"
     c1_c2_doc = (NEW_DIR / "docs" / "C1_C2_METHODOLOGY_AND_LOGIC.md").read_text(encoding="utf-8")
+    c4_doc = (NEW_DIR / "docs" / "C4_RATE_EXTRACTION_LOGIC.md").read_text(encoding="utf-8")
     c5_doc = (NEW_DIR / "docs" / "C5_ADDRESS_MAPPING_LOGIC.md").read_text(encoding="utf-8")
 
     master_logic_content = f"""# Master Logic File: Centene Commercial California PPO Rate Curation
@@ -422,6 +429,10 @@ This document establishes the end-to-end logic for:
 
 ---
 
+{c4_doc}
+
+---
+
 {c5_doc}
 """
     logic_file_path.write_text(master_logic_content, encoding="utf-8")
@@ -431,6 +442,9 @@ This document establishes the end-to-end logic for:
     d3_doc = (NEW_DIR / "docs" / "C3_FILE_QUALITY_METRICS.md").read_text(encoding="utf-8")
     (out_dir / "File_Quality_Metrics.md").write_text(d3_doc, encoding="utf-8")
     summary_metrics["deliverables_generated"].append("File_Quality_Metrics.md")
+
+    with summary_json_path.open("w", encoding="utf-8") as stream:
+        json.dump(summary_metrics, stream, indent=2)
 
     logger.info(">>> PIPELINE COMPLETED SUCCESSFULLY! All deliverables written to %s", out_dir)
     return summary_metrics
@@ -442,8 +456,8 @@ if __name__ == "__main__":
     parser.add_argument("--rate-file", type=Path, action="append", help="Path to local in-network rate file")
     parser.add_argument("--nppes", type=Path, help="Path to local NPPES CSV extract")
     parser.add_argument("--output-dir", type=Path, default=DELIVERABLES_DIR, help="Deliverables output directory")
-    parser.add_argument("--all-codes", action="store_true", help="Extract all codes (disables benchmark filter)")
-    parser.add_argument("--as-of", type=date.fromisoformat, help="C3 reference date (YYYY-MM-DD)")
+    parser.add_argument("--all-codes", action="store_true", help="Legacy option; C4 always processes all codes")
+    parser.add_argument("--as-of", type=date.fromisoformat, help="C3/C4 reference date (YYYY-MM-DD)")
     parser.add_argument("--c3-benchmark-csv", type=Path, help="C3 weighted expected billing-code panel")
     parser.add_argument("--c3-expected-npis-csv", type=Path, help="Verified PPO roster with npi column")
     args = parser.parse_args()

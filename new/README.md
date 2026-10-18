@@ -10,9 +10,9 @@ Under the federal **Transparency in Coverage (TiC)** mandate (45 CFR § 147.212)
 However, extracting reliable intelligence from raw PTD is notoriously difficult:
 1. **Network Disambiguation**: Centene publishes monolithic index files covering hundreds of plans across brands (Health Net, Ambetter, Fidelis, QualChoice). Plan names are inconsistent, and many do not explicitly state a network type.
 2. **Data Quality Deficits**: Published rate files are plagued by $0.00 rates, placeholder rates ($0.01, $99,999), Cartesian duplicates, missing core E/M codes, and contract staleness.
-3. **The Stale NPPES Crisis**: Raw rate files link rates solely to an NPI and a Tax ID (TIN), with **zero addresses and zero specialties**. Relying on raw federal NPPES data is catastrophic because approximately **80% of NPPES addresses are stale, out-of-state, or administrative PO Boxes**.
+3. **Provider Context**: Raw rate files link rates to an NPI and Tax ID (TIN) without practice addresses or specialties. NPPES address and taxonomy records require independent verification before they can support a provider-level deliverable.
 
-This repository implements an end-to-end institutional-grade pipeline that resolves these challenges, isolates Centene's **California Commercial Group PPO network**, grades file quality via a **7-metric Composite File Quality Score (FQS)**, and maps providers to their true physical practicing addresses and NUCC specialties via a **TIN-NPI Co-Occurrence Network Consensus Engine**.
+Current status: C3 grades complete source files and C4 audits and selects published rate contexts from complete source files. C1/C2 PPO classification remains under review, so C4 rates are not verified PPO-network claims. C5–C7 currently produce demonstration outputs using synthetic address seeds.
 
 ---
 
@@ -95,16 +95,13 @@ new/
 - The 579-code individual-specialty panel is built from the supplied case workbook; a verified PPO NPI roster can be supplied for external coverage. Without a roster, provider coverage is reported as unknown, while provider **linkage** is scored.
 - Missing evidence never receives default points. A malformed or missing file fails the run.
 
-### Challenge C4: Streaming Rate Extraction & Multi-Rate Conflict Resolution
+### Challenge C4: Complete-file rate extraction and validation
 - **Module**: `pipeline/c4_rate_extractor/rate_extractor.py`
 - **Documentation**: [`docs/C4_RATE_EXTRACTION_LOGIC.md`](docs/C4_RATE_EXTRACTION_LOGIC.md)
-- Uses memory-bounded `ijson` streaming with early code pruning.
-- **Unpacks individual NPIs** from nested `provider_groups` arrays (fixing the naive `len(npi)` aggregation bug).
-- **Multi-Rate Disambiguation Hierarchy** (Which rate we keep and why):
-  1. *Billing Class*: Prioritize `professional` over `institutional` (isolates physician reimbursement from facility charges).
-  2. *Place of Service*: Prioritize POS 11 (Office / Non-facility) over hospital facility settings.
-  3. *Contract Freshness*: Prioritize latest `expiration_date`.
-  4. *Statistical Tiebreaker*: Select **median rate** across tied tiers to eliminate promotional or carve-out outliers.
+- Streams every item and price into disk-backed validation without a billing-code or row cap. Expands direct and referenced NPI/TIN groups and preserves every decision in `rate_decisions.csv`.
+- Keeps distinct billing classes, settings, service codes, modifiers, rate types, and bundles separate. Only direct professional FFS negotiated dollar rates with concrete codes enter the benchmark selection.
+- Chooses an actual published lower-median candidate within an exact context. Duplicates and alternatives remain auditable; the selected rate is a representative benchmark, not a verified plan-specific contract.
+- Emits per-file `selected_rates.csv`, `rate_decisions.csv`, `c4_summary.json`, and a `c4_manifest.csv` from the master runner or standalone CLI.
 
 ### Challenge C5: Address Mapping & Disambiguation (40 Points Logic)
 - **Modules**: `pipeline/c5_address_mapper/`
@@ -152,8 +149,8 @@ Optional arguments:
 # Point to specific local index or rate file:
 python new/pipeline/run_pipeline.py --index path/to/healthnet_index.json --rate-file path/to/in-network.json
 
-# Extract all codes (disabling benchmark code filter):
-python new/pipeline/run_pipeline.py --all-codes
+# C4 always audits all codes; pass an explicit analysis date for repeatability:
+python new/pipeline/run_pipeline.py --as-of 2026-10-18
 ```
 
 All deliverables are automatically written to `new/deliverables/`.
@@ -165,7 +162,16 @@ cd new
 python -m pipeline.c3_file_grader.file_grader --manifest deliverables/file_manifest.csv --rate-dir ../data/ratefiles --output-dir ../outputs/c3 --as-of 2026-10-18
 ```
 
-Repeat `--file PATH` instead of `--manifest` to grade explicit files. The master runner uses the same C3 API for every PPO-linked file; `--as-of`, `--c3-benchmark-csv`, and `--c3-expected-npis-csv` control its C3 inputs. The original branch's C4–C7 demonstration outputs include synthetic provider/address rows and are **not verified production results**.
+Repeat `--file PATH` instead of `--manifest` to grade explicit files. The master runner uses the same C3 API for every PPO-linked file; `--as-of`, `--c3-benchmark-csv`, and `--c3-expected-npis-csv` control its C3 inputs.
+
+To run complete C4 independently, use the C2 manifest, local MRFs, and optional C3 details:
+
+```powershell
+$env:PYTHONPATH = "new"
+python -m pipeline.c4_rate_extractor.rate_extractor --manifest new/deliverables/file_manifest.csv --rate-dir data/ratefiles --c3-details new/deliverables/file_quality_details.json --as-of 2026-10-18 --output-dir outputs/c4
+```
+
+The C5–C7 demonstration outputs still include synthetic address data and are **not verified production results**.
 
 ---
 

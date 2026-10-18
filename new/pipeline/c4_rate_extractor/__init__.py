@@ -1,6 +1,10 @@
-"""Challenge C4: Streaming Rate Extraction & Multi-Rate Conflict Resolution Engine
-Extracts provider-level rates from large CMS TiC JSON files and resolves multi-rate conflicts.
-"""
-from .rate_extractor import RateExtractor
+"""Challenge C4: complete-file rate extraction and selection."""
 
-__all__ = ["RateExtractor"]
+__all__ = ["RateExtractor", "RateFileInput", "run_files"]
+
+
+def __getattr__(name):
+    if name in __all__:
+        from . import rate_extractor
+        return getattr(rate_extractor, name)
+    raise AttributeError(name)

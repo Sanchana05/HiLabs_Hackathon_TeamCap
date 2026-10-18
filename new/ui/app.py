@@ -27,7 +27,7 @@ st.sidebar.markdown("""
 **Payer**: Centene Corporation  
 **Underwriter**: Health Net Life Insurance Co  
 **Market**: Commercial Group (California)  
-**Network**: Health Net Full Network PPO  
+**Network attribution**: Under review (shared rate file)<br>
 **Snapshot**: 2026-09-30 (Frozen)
 """)
 
@@ -90,7 +90,7 @@ manifest_df = load_manifest()
 # -------------------------------------------------------------
 if view_mode == "📊 Executive Overview & Quality":
     st.title("Executive Dashboard: Centene CA Commercial PPO Rate Intelligence")
-    st.markdown("C3 is audited on the complete published rate file. The older C4–C7 demonstration outputs include synthetic provider addresses and are not verified results.")
+    st.markdown("C3 and C4 audit complete published rate files when their reports are present. C2 network attribution remains under review; C5–C7 use demonstration address data.")
 
     selected_name = st.selectbox("Rate file", [row["file_name"] for row in quality_details]) if quality_details else None
     selected_quality = next((row for row in quality_details if row["file_name"] == selected_name), {})
@@ -99,9 +99,11 @@ if view_mode == "📊 Executive Overview & Quality":
     grade = selected_quality.get("grade", "NOT_GRADED")
 
     col1.metric("C3 File Quality Score", f"{fqs} / 100" if fqs is not None else "Not graded", f"Grade {grade}")
-    col2.metric("Confirmed PPO Plans", str(summary_data.get('confirmed_ppo_count', 'N/A')), "Exact EOC Match")
+    col2.metric("C2 Confirmed PPO Labels", str(summary_data.get('confirmed_ppo_count', 'N/A')), "Evidence review pending")
     col3.metric("Provisional PPO Plans", str(summary_data.get('provisional_ppo_count', 'N/A')), "Custom Group PPO")
-    col4.metric("C4 Demonstration Rates", f"{summary_data.get('curated_rates_count', 0):,}", "Not a verified full extraction")
+    c4_reports = summary_data.get("c4_file_summaries", [])
+    c4_selected = sum(report.get("counts", {}).get("selected", 0) for report in c4_reports)
+    col4.metric("C4 Selected Rate Contexts", f"{c4_selected:,}" if c4_reports else "Not run", "PPO attribution unverified")
     col5.metric("Verified Practice Address", "Not verified", "C5 requires independent sources")
 
     st.markdown("---")
