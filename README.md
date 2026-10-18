@@ -19,6 +19,8 @@ The [strict verified workbook](audit/c6/Centene_CA_Commercial_PPO_Provider_Rates
 
 ## Reproduce the pipeline
 
+**A clean clone does not contain all raw inputs needed for a full rerun.** The repository includes the 11 index JSON files, the dated filtered CMS clinician extract, code, and the reviewed outputs. The full C1–C6 run requires obtaining the Health Net MRF, NPPES monthly files and deactivation report, and NUCC taxonomy CSV. The MRF and NPPES files are too large for this Git repository; NUCC also has source licensing terms. An internet connection, sufficient local storage, and permission to obtain those inputs are prerequisites for reproducing the submitted counts.
+
 Use Python 3.12 and the repository root as the working directory. The code resolves its configuration and output paths from this checkout; the command accepts input paths as arguments. No machine-specific paths are embedded in the pipeline.
 
 ```powershell
@@ -27,7 +29,9 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-The 11 small source indexes are committed in `data/indexes/`. Supply these large public source files locally; they are excluded from Git:
+**No raw-data check:** `python -m pytest tests -q` exercises the stage logic from small test fixtures. The four files in `deliverables/` and the supporting files in `audit/` can be inspected immediately. This check does not reproduce the published 2026 source run.
+
+The 11 small source indexes are committed in `data/indexes/`. To reproduce the full published run, supply these source files locally; they are excluded from Git:
 
 | Input | Place at |
 | --- | --- |
