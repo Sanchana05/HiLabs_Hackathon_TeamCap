@@ -14,3 +14,5 @@ The committed files in this directory come from the 2026-10-18 source run. The H
 | `VIDEO_SCRIPT.md` | Recording plan | A video file has not been recorded or exported. |
 
 The optional C7 provider cost-effectiveness file is absent because there are no verified PPO-specific C6 rows to benchmark. Recreate the files with the documented master command in `../README.md`; it requires the large local source MRF and NPPES inputs, which are excluded from Git.
+
+The merged-branch test and full rerun results are recorded in [`../docs/INTEGRATION_VALIDATION.md`](../docs/INTEGRATION_VALIDATION.md).
