@@ -1,0 +1,65 @@
+{
+  "as_of": "2026-10-18",
+  "unique_npis": 3155,
+  "npi_tin_pairs": 3195,
+  "type_1_pairs": 679,
+  "type_2_pairs": 2508,
+  "location_rows": 5028,
+  "candidate_locations": 4621,
+  "corroborated_locations": 181,
+  "conflicted_locations": 226,
+  "unresolved_pairs": 123,
+  "unique_tins": 2465,
+  "unique_physical_addresses": 4323,
+  "unique_npis_with_physical_candidate": 3033,
+  "unique_npis_with_corroborated_site": 177,
+  "unique_npis_with_proven_tin_site": 0,
+  "unique_npis_with_confirmed_ppo_site": 0,
+  "unique_npis_with_fully_verified_link": 0,
+  "share_npis_with_corroborated_site": 5.61,
+  "share_npis_with_confirmed_ppo_site": 0.0,
+  "share_npis_with_fully_verified_link": 0.0,
+  "outputs": [
+    "c5_provider_locations.csv",
+    "c5_evidence.csv",
+    "c5_review_queue.csv"
+  ],
+  "inputs": [
+    {
+      "path": "selected_rates.csv",
+      "size_bytes": 11077877,
+      "modified_ns": 1792337313023661000,
+      "sha256": "097cdab618b36d97c4eed2b640f4a5d0e550321394c78e029a2c4515c6c67055"
+    },
+    {
+      "path": "npidata_pfile_20050523-20261011.csv",
+      "size_bytes": 11758264877,
+      "modified_ns": 1791755824000000000,
+      "sha256": ""
+    },
+    {
+      "path": "pl_pfile_20050523-20261011.csv",
+      "size_bytes": 121926581,
+      "modified_ns": 1791755934000000000,
+      "sha256": "3233e9e5be033e618d0870297eb288d542f0ce8d460b38fb4635ead8c8c399b5"
+    },
+    {
+      "path": "NPPES Deactivated NPI Report 20261012.xlsx",
+      "size_bytes": 5627861,
+      "modified_ns": 1791754264000000000,
+      "sha256": "0552b3192932726cd4ed69679b2f895638479bd4cedbaf6091ffea12d8b974ad"
+    },
+    {
+      "path": "nucc_taxonomy_261.csv",
+      "size_bytes": 529245,
+      "modified_ns": 1792244851410695900,
+      "sha256": "0615cce1dac2fae75e8a0497657fd3ad81f9505c829fb6129a6551583f4fe0fb"
+    },
+    {
+      "path": "cms_clinicians_ca_matched_2026-10-02.csv",
+      "size_bytes": 96428,
+      "modified_ns": 1792336514815032600,
+      "sha256": "47d4149de03c29ca795ff8b2f0e562407079070bc6e05dc976856cfde7c7a8b1"
+    }
+  ]
+}
